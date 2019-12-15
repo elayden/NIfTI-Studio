@@ -264,7 +264,7 @@ n_ticks_x = 10; n_ticks_y = 10;
 xticks = []; yticks = [];
 
 % Menu Handles:
-orientation_labels = {'Coronal','Sagittal','Axial','3D Display','Mosaic'};
+orientation_labels = {'Coronal','Sagittal','Axial','3D Display'}; % 'Mosaic'
 menu_orientations = zeros(1,length(orientation_labels)); 
 menu_slice_number = []; menu_colorbar = []; menu_axis_tick = [];
 

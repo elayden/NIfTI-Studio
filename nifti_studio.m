@@ -356,23 +356,6 @@ elseif isstruct(parsed_inputs.(poss_input{1}))
     load_img('struct');
 end
 
-% Add Overlays If Requested:
-if ~isempty(parsed_inputs.overlay)
-    overlay_present = 1;
-    switch class(parsed_inputs.overlay)
-        case 'char'
-            openNewOverlay([], [], 'char');
-        case 'struct'
-            openNewOverlay([], [], 'struct');
-        otherwise
-            if isnumeric(parsed_inputs.overlay)
-                openNewOverlay([], [], 'matrix');
-            end
-    end
-else
-    overlay_present = 0;
-end
-
 %% Create Menu Items:
 if isempty(parsed_inputs.axes)
     
@@ -387,12 +370,12 @@ if isempty(parsed_inputs.axes)
         
     % CLOSE
     close_overlays_menu = uimenu(file_menu,'Label','Close Overlay...');
-    if overlay_present
-        h_close(2) = uimenu(close_overlays_menu,'Label',...
-            sprintf('Overlay %g',1),'Callback',{@closeOverlay,2}); % start at 2 to match h_image
-    else
+%     if overlay_present
+%         h_close(2) = uimenu(close_overlays_menu,'Label',...
+%             sprintf('Overlay %g',1),'Callback',{@closeOverlay,2}); % start at 2 to match h_image
+%     else
         h_close = [];
-    end
+%     end
     
     % SAVE  
     save_menu = uimenu(file_menu,'Label','Save');
@@ -409,12 +392,12 @@ if isempty(parsed_inputs.axes)
     select_menu = uimenu(handles.figure,'Label','Select');
     h_image(1) = uimenu(select_menu,'Label','Background Image',...
         'Callback',{@changeSelection,1});
-    if overlay_present
-        h_image(2) = uimenu(select_menu,'Label',sprintf('Overlay %g',1),...
-            'Checked','on','Callback',{@changeSelection,2});
-    else
+%     if overlay_present
+%         h_image(2) = uimenu(select_menu,'Label',sprintf('Overlay %g',1),...
+%             'Checked','on','Callback',{@changeSelection,2});
+%     else
         set(h_image(1),'Checked','on')
-    end
+%     end
     h_new_image = uimenu(select_menu,'Label','New Overlay...',...
         'Callback',@createOverlay);
 
@@ -528,25 +511,32 @@ if isempty(parsed_inputs.axes)
         h_opacity_menu(j) = uimenu(opacity_menu,...
             'Label', alpha_opts{j},'Callback', {@opacity_callback, j});
     end
-    if overlay_present
-        set(h_opacity_menu(strcmp(alpha_opts, alphaValue{2})), 'Checked','on')
-    else
+%     if overlay_present
+%         set(h_opacity_menu(strcmp(alpha_opts, alphaValue{2})), 'Checked','on')
+%     else
         set(h_opacity_menu(1), 'Checked','on')
         set(opacity_menu, 'Visible','off')
-    end
+%     end
 end
 
 %% Customizations
-% refresh_img = true;
-% updateImage;
-% for ixx = 5:6
-%     input1 = parsed_inputs.(poss_input{ixx});
-%     if ~isempty(input1)
-%         if islogical(input1) || isnumeric(input1)
-%             eval([poss_input{ixx},'=',num2str(input1),';']);
-%         end
-%     end
-% end
+
+% Must run to initialize axes etc., prior to the subsequent lines
+updateImage
+
+% Add Overlays If Requested:
+if ~isempty(parsed_inputs.overlay)
+    switch class(parsed_inputs.overlay)
+        case 'char'
+            openNewOverlay([], [], 'char');
+        case 'struct'
+            openNewOverlay([], [], 'struct');
+        otherwise
+            if isnumeric(parsed_inputs.overlay)
+                openNewOverlay([], [], 'matrix');
+            end
+    end
+end
 
 % Resize Figure Window Based on Aspect Ratio of Image:
 if ~isempty(parsed_inputs.colormap)
@@ -647,11 +637,11 @@ function load_img(img_type)
     end
     
     % Clear overlay menu items if present
-    if exist('h_image', 'var') && numel(h_image > 1)
+    if exist('h_image', 'var') && numel(h_image) > 1
         h_image = h_image(1);
     end
     
-    if exist('h_close', 'var') && numel(h_close > 1)
+    if exist('h_close', 'var') && numel(h_close) > 1
         h_close = h_close(1);
     end
         
@@ -722,9 +712,7 @@ function openNewOverlay(~, ~, load_type)
                     'Select Overlay Image:','MultiSelect','off');
                 cd(first_dir);
             elseif nargin==3
-                if overlay_num==1
-                    [overlay_path, overlayName, ext] = fileparts(parsed_inputs.(poss_input{2}));
-                end
+                [overlay_path, overlayName, ext] = fileparts(parsed_inputs.(poss_input{2}));
                 overlayName = [overlayName, ext];  
             end
             if ischar(overlayName)
@@ -844,7 +832,9 @@ end
 
 function incrementOverlayMenus(overlayName)
     % Remove New Overlay menu item, then regenerate it at the end of list:
-    delete(h_new_image) 
+    if exist('h_new_image','var') && ishandle(h_new_image)
+        delete(h_new_image)
+    end
     
     % Add new SELECT menu:
     if nargin==0 || isempty(overlayName)
@@ -923,7 +913,7 @@ function getSettings
         ind = strfind(gui_settings{ix1},'=');
         eval([customizable{ix1}, '=[', gui_settings{ix1}(ind+1:end),'];']);
     end
-    if ~isdir(last_nav_dir); last_nav_dir = pwd; end  
+    if ~isdir(last_nav_dir); last_nav_dir = pwd; end %#ok
 end
 
 function write_settings
@@ -1045,7 +1035,7 @@ function save_callback(~, ~, save_type)
 
             % Check whether canceled
             if ~ischar(filename); return; end
-            if isdir(PathName); last_nav_dir = PathName; end
+            if isdir(PathName); last_nav_dir = PathName; end %#ok
             
             fullPaths{selectedImage} = fullfile(PathName, filename);
         end
@@ -1053,13 +1043,17 @@ function save_callback(~, ~, save_type)
             
     % Revert to original orientation
     saveOrientation = [];
-    if slice_orientation~=3; 
+    if slice_orientation ~= 3
         saveOrientation = slice_orientation;
         reorient_callback(menu_orientations(3)); 
     end
     
     img.img = permute(imageData{selectedImage},[2,1,3]);
-    if untouch_nii; save_untouch_nii(img, fullPaths{selectedImage}); else save_nii(img, fullPaths{selectedImage}); end
+    if untouch_nii
+        save_untouch_nii(img, fullPaths{selectedImage})
+    else
+        save_nii(img, fullPaths{selectedImage})
+    end
     
     if save_type == 1
         disp(['Background image successfully saved as ', fullPaths{1}])
@@ -1088,11 +1082,11 @@ function saveas_callback(~, ~, save_type)
     
     % Check whether canceled
     if ~ischar(filename); return; end
-    if isdir(PathName); last_nav_dir = PathName; end
+    if isdir(PathName); last_nav_dir = PathName; end %#ok
             
     % Revert to original orientation
     saveOrientation = [];
-    if slice_orientation~=3; 
+    if slice_orientation ~= 3 
         saveOrientation = slice_orientation;
         reorient_callback(menu_orientations(3)); 
     end
@@ -1100,7 +1094,11 @@ function saveas_callback(~, ~, save_type)
     % Save:
     img.img = permute(imageData{selectedImage},[2,1,3]);
     fullPaths{selectedImage} = fullfile(PathName, filename);
-    if untouch_nii; save_untouch_nii(img, fullPaths{selectedImage}); else save_nii(img, fullPaths{selectedImage}); end
+    if untouch_nii
+        save_untouch_nii(img, fullPaths{selectedImage})
+    else
+        save_nii(img, fullPaths{selectedImage})
+    end
 
     % Save types:
     if save_type == 1 % save background
@@ -1433,7 +1431,7 @@ function colorscale_callback(~, ~, cscale_num)
             cmin1 = min(imageData{selectedImage}(:));
             cmax1 = max(imageData{selectedImage}(:));
             prompt = {['Specify range intensity values for color axis: ',...
-                char(10),'Min:'],'Max:'}; 
+                char(10),'Min:'],'Max:'}; %#ok
             dlg_title = 'Input CAxis Limits'; num_lines = [1,20;1,20]; 
             defaultans = {num2str(cmin1),num2str(cmax1)};
             answer1 = inputdlg(prompt,dlg_title,num_lines,defaultans);

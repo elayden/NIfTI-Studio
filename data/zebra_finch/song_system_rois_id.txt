@@ -1,0 +1,21 @@
+1 - L Area X
+2 - R Area X
+3 - L LMAN 
+4 - R LMAN
+5 - L RA
+6 - R RA
+7 - L HVC
+8 - R HVC
+9 - L Auditory Forebrain (NCM, CMM); minus Field L
+10 - R Auditory Forebrain (NCM, CMM); minus Field L
+11 - L Field L
+12 - R Field L
+13 - L Medial Diencephalon
+14 - R Medial Diencephalon
+15 - L Medulla
+16 - R Medulla
+17 - L mMAN
+18 - R mMAN
+
+NCM = Caudomedial Nidopallium
+CMM = Caudomedial Mesopallium

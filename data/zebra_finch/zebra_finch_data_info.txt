@@ -1,0 +1,9 @@
+Data comes from the following publication:
+
+Layden, E. A., Schertz, K. E., London, S. E., & Berman, M. G. (2019). 
+Interhemispheric functional connectivity in the zebra finch brain, 
+absent the corpus callosum in normal ontogeny. NeuroImage, 195, 113-127.
+
+Key supporting data, including these NIfTI files, can be found here:
+
+https://gin.g-node.org/elayden/Zebra_Finch_Functional_Homotopy/src/master/template_rois

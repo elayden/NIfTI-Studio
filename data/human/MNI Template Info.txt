@@ -1,0 +1,6 @@
+MNI Template Info
+
+http://www.bic.mni.mcgill.ca/ServicesAtlases/ICBM152NLin2009
+
+ICBM 2009a Nonlinear Symmetric
+NIFTI 56MB

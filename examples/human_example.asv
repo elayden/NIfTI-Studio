@@ -1,0 +1,5 @@
+
+nifti_studio_path = 'C:\Users\PC-3PO\Desktop\NIfTI-Studio';
+WM = fullfile(nifti_studio_path, '\data\human\mni_icbm152_wm_tal_nlin_sym_09a.nii');
+
+% Threshold GM and WM to rem

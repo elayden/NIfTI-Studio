@@ -648,6 +648,7 @@ function load_img(img_type)
     % Parse image input
     window_name = ['NIfTI Studio:    ',filename];
     set(handles.figure,'Name',window_name);  
+    d=0
     dim = img.hdr.dime.dim; 
     pixdim = img.hdr.dime.pixdim; 
     voxSize = pixdim(2:4);
@@ -655,7 +656,7 @@ function load_img(img_type)
     yheight = dim(3)*pixdim(3); 
     imageData = {single(img.img)}; % conversion may enhance refresh speed
     imageData{1} = permute(imageData{1},[2,1,3]); % Match SPM View
-    [xdim,ydim,zdim] = size(imageData{1});
+    [xdim, ydim, zdim] = size(imageData{1});
     middle_slice = round(zdim/2); 
     curr_slice = middle_slice;
     draw_on = false; 
@@ -890,7 +891,7 @@ function sort_exts(path1,name1)
     extensions = extensions([type,others]);
 end
 
-function resize_figure
+function resizeFigure
     if slice_orientation == 3
         aspect_ratio = (xwidth*(1/x_ax_percent))/(yheight*(1/y_ax_percent));
     else
@@ -1161,7 +1162,7 @@ function reorient_callback(hObject, ~, ~)
     
     % Add to undoCache
     if ~strcmp(reorient_type, '3D Display') && nargin < 3
-        cacheState([], 'reorient', slice_orientation, [], [],[])
+        cacheState(selectedImage, 'reorient', slice_orientation, [], [],[])
     end
     
     switch reorient_type
@@ -1283,6 +1284,7 @@ function reorient_callback(hObject, ~, ~)
             
             % Generate new plot
             if strcmp(reorient_type, '3D Display')
+                
                 if numel(imageData) > 1
                     [~] = nifti_studio_3D('background',background_img,...
                         'ROI',overlay1_img,'roi_type',1, ... %'titles','Overlay 1',...
@@ -1291,38 +1293,20 @@ function reorient_callback(hObject, ~, ~)
                     [~] = nifti_studio_3D('background',background_img,... % 'titles','Background', ...
                         'vox_thresh', quantile(background_img.img(:), background_thresh_3d));
                 end
+                
             elseif strcmp(reorient_type, 'Mosaic')
                                 
-                if save_orientation == 1 % Coronal view
-                    use_orientation = 1; % X-slices
-                    useDim = xdim;
-                elseif save_orientation == 2 % Sagittal view
-                    use_orientation = 2; % Y-slices
-                    useDim = ydim;
-                else
-                    use_orientation = 3;
-                    useDim = zdim;
-                end
-                slices = round(linspace(.2 * useDim, .9 * useDim, 10));
-                
                 if numel(imageData) > 1
                     [~] = nifti_studio_mosaic('background',background_img,...
                         'overlay',overlay1_img',...
                         'title','NIfTI Studio Mosaic',...
-                        'slices',slices,...
-                        'axes_direction',2,...
-                        'dimension',use_orientation,...
-                        'slice_locator',0,...
-                        'background_color',zeros(1,3));
+                        'dimension',save_orientation);
                 else
                     [~] = nifti_studio_mosaic('background',background_img, ...
                         'title','NIfTI Studio Mosaic',...
-                        'slices',slices, ...
-                        'axes_direction',2,...
-                        'dimension',use_orientation,...
-                        'slice_locator',0,...
-                        'background_color',zeros(1,3));  % 'axes_dim',[2,4]
+                        'dimension',save_orientation); 
                 end
+                
             end
             
             % Return to Original Orientation if Changed:
@@ -1346,7 +1330,7 @@ function reorient_callback(hObject, ~, ~)
         imageData{i} = permute(imageData{i}, dimperm);
         alphaData{i} = permute(alphaData{i}, dimperm);
     end
-    [xdim,ydim,zdim] = size(imageData{1}); 
+    [xdim, ydim, zdim] = size(imageData{1}); 
     voxSize = voxSize(dimperm);
 
     % Determine possible combinations of x,y indices:
@@ -1371,7 +1355,7 @@ function reorient_callback(hObject, ~, ~)
     refresh_img = false; 
     updateImage
     repositionAxes
-    resize_figure;
+    resizeFigure;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1718,6 +1702,7 @@ function undoCallback(~, ~, ~)
     if undoNum==0; return; end
         
     % Update or initialize redoCache
+    undoCache(undoNum)
     if undoNum == length(undoCache) % first undo
         if undoCache(undoNum).selectedImage==1
             redoCache = struct('selectedImage', undoCache(undoNum).selectedImage, ...
@@ -2598,7 +2583,7 @@ function repositionAxes(~)
             curr_axis_pos(2),colorbar_pos(3),curr_axis_pos(4)])
     end
     if resize1
-        resize_figure
+        resizeFigure
     end
 end
             

@@ -73,8 +73,9 @@ roiLimit = 50; % if more ROIs than this specificied, treats as voxel-wise overla
 % Retrieve name-value pair inputs:
 inputs = varargin;
 parsed_inputs = struct('background',[],'overlay',[],...
-    'slices',[],'title',[],'dimension',3,'slice_locator',1,...
-    'slice_locator_pos',[],'axes_dim',[],'axes_direction',2,'rotate',[],...
+    'slices',[],'title',[],'dimension',3,'slice_locator',0,...
+    'slice_locator_pos',[],'axes_dim',[2,5],'axes_direction',2,...
+    'customize',0, 'rotate',[],...
     'overlay_alpha',.8,'background_cmap','gray',...
     'background_caxis',[],'overlay_clim',[],'overlay_cmap','jet',...
     'roi_colors',[],'axis_ticks',1,...
@@ -85,7 +86,7 @@ parsed_inputs = struct('background',[],'overlay',[],...
 
 poss_input = {'background','overlay','slices','title',...
     'dimension','slice_locator','slice_locator_pos','axes_dim',...
-    'axes_direction','rotate','overlay_alpha',...
+    'axes_direction','customize','rotate','overlay_alpha',...
     'background_cmap','background_caxis','overlay_clim','overlay_cmap',...
     'roi_colors','axis_ticks','background_color','mesh_color','print',...
     'print_res','show_axes','background_thresh','unit_measure','physical_units',...
@@ -118,7 +119,7 @@ if ~isempty(background)
                 end
             end
             imdat = back_img.img; 
-            pixdim = back_img.hdr.dime.pixdim(2:4);
+            pixdim = back_img.hdr.dime.pixdim([3,2,4]);
             % Determine Units:
             unit_code = back_img.hdr.dime.xyzt_units(1);
             switch unit_code
@@ -142,7 +143,7 @@ if ~isempty(background)
                 case 3, physical_units = '(microns)';
                 otherwise, physical_units = '';
             end
-            pixdim = background.hdr.dime.pixdim(2:4);
+            pixdim = background.hdr.dime.pixdim([3,2,4]);
         otherwise
             if isnumeric(background)
                 imdat = background;
@@ -155,64 +156,74 @@ if ~isempty(background)
 else
     load_new_background
 end
-background_dim = size(imdat);
 
 % Load Overlays:
 if ~isempty(parsed_inputs.overlay)
-    [overlay_dat,~,~] = load_ROI(parsed_inputs.overlay, background_dim, 'overlay');
+    [overlay_dat,~,~] = load_ROI(parsed_inputs.overlay, size(imdat), 'overlay');
     overlay_on = 1;
 else
     overlay_dat = [];
     overlay_on = 0;
 end
 
-% use_title = parsed_inputs.title;
-dimension = parsed_inputs.dimension;
+% Permute x- and y-dimensions for display
+imdat = permute(imdat,[2,1,3]);
+overlay_dat = permute(overlay_dat,[2,1,3]);
+background_dim = size(imdat);
+xmax = background_dim(2);
+ymax = background_dim(1);
+
+dimension = parsed_inputs.dimension; % default 3; never empty
+axes_direction = parsed_inputs.axes_direction; % default 2 (column-wise); never empty
+slice_locator_on = parsed_inputs.slice_locator; % default 0 (off); never empty
+axes_dim = parsed_inputs.axes_dim; % default [2,5]; never empty (but adjust later if can't accomodate slices)
+slices = parsed_inputs.slices; % no default; can be empty
+numslices = [];
+
 % Check Slices Specified:
-if isempty(parsed_inputs.slices)
-    if background_dim(dimension) >= 6
-        slices = round(linspace(1,background_dim(dimension),6));
-    elseif background_dim(dimension) >= 4
-        slices = round(linspace(1,background_dim(dimension),4));
-    elseif background_dim(dimension) >= 2
-        slices = round(linspace(1,background_dim(dimension),2));
-    else slices = 1;
+findSlices
+
+% Utility for automatically calculating slices
+function findSlices
+    % Number of slices (depends on slice_locator)
+    if slice_locator_on
+        numslices = prod(axes_dim) - 1;
+    else
+        numslices = prod(axes_dim);
     end
-else
-    slices = parsed_inputs.slices;
-    % TODO: problem is that imdat has first and second dims permuted
-    % relative to background_dim
-%     if max(slices) > background_dim(dimension) || any(slices<1)
-%         error(['Slice numbers specified are out of bounds. Slices must be between 1 and ',...
-%             num2str(background_dim(dimension)),' for dimension ',num2str(dimension),'.'])
-%     end
+    % Find slices if not specified
+    if isempty(slices)
+        slices = unique(round(linspace(.2 * background_dim(dimension), ...
+            .8 * background_dim(dimension), numslices)));
+    end
+    % Check slices
+    if any(slices > background_dim(dimension)) || any(slices < 1)
+        error(['Slice numbers specified are out of bounds. Slices must be between 1 and ',...
+            num2str(background_dim(dimension)),' for dimension ',num2str(dimension),'.'])
+    end
 end
-numslices = length(slices);
 
 % Determine Slice Locator Axes Position:
-slice_locator_on = parsed_inputs.slice_locator;
 locator_outside = 0;
 if slice_locator_on
-    if ~isempty(parsed_inputs.slice_locator_pos) && parsed_inputs.slice_locator_pos<=(numslices+1)
+    if ~isempty(parsed_inputs.slice_locator_pos) && parsed_inputs.slice_locator_pos <= numslices + 1
         slice_locator_pos = parsed_inputs.slice_locator_pos;
     elseif isnan(parsed_inputs.slice_locator_pos)
         locator_outside = 1;
-    else slice_locator_pos = length(slices)+1;
+    else
+        slice_locator_pos = length(slices)+1; % last axes
     end
     n_axes = numslices+1;
 else
     n_axes = numslices;
 end
 
-% Determine Axes Dimensions:
-axes_dim = parsed_inputs.axes_dim;
-if isempty(axes_dim) || prod(axes_dim)<n_axes
-    if ~isempty(axes_dim)
-        if slice_locator_on
-            warning('The product of input ''axes_dim'' must be greater than or equal to #slices+1 if the slice_locator is on. Ignoring input...')
-        else
-            warning('The product of input ''axes_dim'' must be greater than or equal to #slices when the slice_locator is off. Ignoring input...')
-        end
+% Adjust axes dimensions if unable to accomodate slices:
+if prod(axes_dim) < n_axes
+    if slice_locator_on
+        warning('The product of input ''axes_dim'' must be greater than or equal to #slices + 1 if the slice_locator is on. Ignoring input...')
+    else
+        warning('The product of input ''axes_dim'' must be greater than or equal to #slices when the slice_locator is off. Ignoring input...')
     end
     if n_axes<=20 && n_axes>15
         axes_dim = [4,5];
@@ -226,13 +237,9 @@ if isempty(axes_dim) || prod(axes_dim)<n_axes
         axes_dim = [2,3];
     elseif n_axes==4
         axes_dim = [2,2];
-    else axes_dim = [1,n_axes];   
+    else
+        axes_dim = [1,n_axes];
     end
-end
-
-if ~any([parsed_inputs.axes_direction==1,parsed_inputs.axes_direction==2])
-    axes_direction = 2;
-else axes_direction = parsed_inputs.axes_direction;
 end
 
 % Get Physical Units:
@@ -274,7 +281,6 @@ if ~isempty(roi_colors)
     end
 end
     
-% axis_ticks = parsed_inputs.axis_ticks;
 background_color = parsed_inputs.background_color;
 background_thresh = parsed_inputs.background_thresh;
 opacity_options = {'Opaque','90%','80%','70%','60%','50%','40%','30%','20%','10%','Invisible'};
@@ -285,8 +291,6 @@ m = 100; % # of colormap entries
 scroll_zoom_equiv = [1,.9,.8,.7,.6,.5,.4,.3,.2,.1];
 scroll_count = 0;
 xmin = 1; ymin = 1;
-xmax = background_dim(1);
-ymax = background_dim(2);
 first_click = [];
 drag_click = [];
 curr_ax = 28.3938;
@@ -302,15 +306,21 @@ handles.overlay_axes = repmat(10.28173,1,n_axes);
 handles.background_images = repmat(10.28173,1,n_axes);
 handles.overlay_images = repmat(10.28173,1,n_axes);
 
-imdat = permute(imdat,[2,1,3]);
-overlay_dat = permute(overlay_dat,[2,1,3]);
 ax_pos = zeros(n_axes,4);
 slice_distances = zeros(1,numslices);
 
+% Initialize slice data containers
 switch dimension
-    case 1, background_slice_data = zeros(background_dim(3),background_dim(1),numslices);
-    case 2, background_slice_data = zeros(background_dim(3),background_dim(2),numslices);
-    case 3, background_slice_data = zeros(background_dim(2),background_dim(1),numslices);
+    case 1, background_slice_data = zeros(background_dim(3),background_dim(2),numslices);
+    case 2, background_slice_data = zeros(background_dim(3),background_dim(1),numslices);
+    case 3, background_slice_data = zeros(background_dim(1),background_dim(2),numslices);
+end
+if overlay_on
+    switch dimension
+        case 1, overlay_slice_data = zeros(background_dim(3),background_dim(2),numslices);
+        case 2, overlay_slice_data = zeros(background_dim(3),background_dim(1),numslices);
+        case 3, overlay_slice_data = zeros(background_dim(1),background_dim(2),numslices);
+    end
 end
 
 h_colorbar_fig = 28.332737;
@@ -319,13 +329,6 @@ h_new_plot_fig = 382.4747;
 background_colors = [1,1,1;0,0,0;.2,.6,.7;0,0,1;1,0,0;0,1,0;0,1,1;1,0,1;1,1,0];
 roi_single_colors = [1,0,0;0,0,1;0,1,0;0,1,1;1,0,1;1,1,0;0,0,0];
 annotation_background_colors = [0,0,0;1,0,0;0,0,1;0,1,0;0,1,1;1,0,1;1,1,0;0,0,0;1,1,1];
-if overlay_on
-    switch dimension
-        case 1, overlay_slice_data = zeros(background_dim(3),background_dim(1),numslices);
-        case 2, overlay_slice_data = zeros(background_dim(3),background_dim(2),numslices);
-        case 3, overlay_slice_data = zeros(background_dim(2),background_dim(1),numslices);
-    end
-end
 first_cmap_change = 1;
 
 % roi_cmap_options = {'jet','hot','cool','hsv','bone','colorcube','copper',...
@@ -355,7 +358,7 @@ file_menu = uimenu(handles.figure,'Label','File');
     uimenu(file_menu,'Label','Save Figure','Callback',@save_figure_callback);
     uimenu(file_menu,'Label','Print','Callback',{@print_callback,0});
 new_plot_menu = uimenu(handles.figure,'Label','New Plot');
-    uimenu(new_plot_menu,'Label','Specify...','Callback',@new_plot);
+    uimenu(new_plot_menu, 'Label','Specify...','Callback',@new_plot)
 tools_menu = uimenu(handles.figure,'Label','Tools');
     uimenu(tools_menu,'Label','Rotate Slices','Callback',@rotate_slices);
     h_tools(1) = uimenu(tools_menu,'Label','Pan','Checked','on','Callback',{@change_tool,1});
@@ -482,12 +485,14 @@ if slice_locator_on
 end
 % End Menus
 
-if isempty(parsed_inputs.slices)
+% Allow advanced user customization
+if parsed_inputs.customize
     new_plot([], [], 1)
 else
     plot_mosaic(1)
 end
 
+%% Begin plotting
 function plot_mosaic(initial)
     % Determine Axes Positions
     if nargin==1 && initial 
@@ -597,6 +602,7 @@ function plot_mosaic(initial)
         end
         handles.mesh = zeros(1,numslices);
     end
+    
     % Create Axes and Plot Mosaic:
     for ix = 1:numslices
         handles.background_axes(ix) = axes('parent',handles.figure,...
@@ -606,21 +612,22 @@ function plot_mosaic(initial)
             set(handles.background_axes(ix),'Visible','off');
         end
         switch dimension
-            case 1, 
+            case 1
                 background_slice = squeeze(imdat(slices(ix),:,:))';
                 set(handles.background_axes(ix),...
                     'XLim',[1,background_dim(3)],...
                     'YLim',[1,background_dim(2)]);
-            case 2, 
+            case 2
                 background_slice = squeeze(imdat(:,slices(ix),:))';
                 set(handles.background_axes(ix),...
                     'XLim',[1,background_dim(1)],...
                     'YLim',[1,background_dim(3)],...
                     'Xdir','reverse');
-            case 3, background_slice = squeeze(imdat(:,:,slices(ix)));
+            case 3
+                background_slice = squeeze(imdat(:,:,slices(ix)));
                 set(handles.background_axes(ix),...
-                    'XLim',[1,background_dim(2)],...
-                    'YLim',[1,background_dim(1)]);
+                    'XLim',[1,background_dim(1)],...
+                    'YLim',[1,background_dim(2)]);
         end
         background_slice_data(:,:,ix) = background_slice;
         alpha_background = zeros(size(background_slice));
@@ -634,19 +641,22 @@ function plot_mosaic(initial)
                 'Visible','off','units','normalized');
             colormap(handles.overlay_axes(ix),overlay_cmap);
             switch dimension
-                case 1, overlay_slice = squeeze(overlay_dat(slices(ix),:,:))';
+                case 1
+                    overlay_slice = squeeze(overlay_dat(slices(ix),:,:))';
                     set(handles.overlay_axes(ix),...
                         'XLim',[1,background_dim(3)],...
                         'YLim',[1,background_dim(2)]);
-                case 2, overlay_slice = squeeze(overlay_dat(:,slices(ix),:))';
+                case 2
+                    overlay_slice = squeeze(overlay_dat(:,slices(ix),:))';
                     set(handles.overlay_axes(ix),...
                         'XLim',[1,background_dim(1)],...
                         'YLim',[1,background_dim(3)],...
                         'Xdir','reverse')
-                case 3, overlay_slice = squeeze(overlay_dat(:,:,slices(ix)));
+                case 3
+                    overlay_slice = squeeze(overlay_dat(:,:,slices(ix)));
                     set(handles.overlay_axes(ix),...
-                        'XLim',[1,background_dim(2)],...
-                        'YLim',[1,background_dim(1)]);
+                        'XLim',[1,background_dim(1)],...
+                        'YLim',[1,background_dim(2)]);
             end
             alpha_slice = zeros(size(overlay_slice));
             alpha_slice(overlay_slice>overlay_clim(1)) = overlay_alpha;
@@ -681,9 +691,9 @@ function plot_mosaic(initial)
 end
 
 rotate3d off
-if overlay_on
+if overlay_on && ishandle(handles.overlay_axes(1))
     axes(handles.overlay_axes(1));
-else
+elseif ishandle(handles.background_axes(1))
     axes(handles.background_axes(1));
 end
 
@@ -710,10 +720,8 @@ if ~isempty(parsed_inputs.print) && ischar(parsed_inputs.print)
     print_callback([],[],1);
 end
 
-%% Callbacks:
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% FIGURE ACTIONS
+%% FIGURE ACTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function scroll_zoom_callback(~, eventdata, ~)
@@ -808,14 +816,15 @@ function print_callback(~,~,manually)
         if isnumeric(path1) && path1==0
             disp('User cancelled printing.'); return;
         end
-    else figure_title = parsed_inputs.print;
+    else
+        figure_title = parsed_inputs.print;
     end
     [~,~,file_ext] = fileparts(figure_title);
     % Identify File Extension:
     exts = {'-dpng','-dtiff','-dbmp'};
     ext_ind = [];
     for ixxx = 1:3
-        if ~isempty(strfind(exts{ixxx},file_ext(2:end)));
+        if ~isempty(strfind(exts{ixxx},file_ext(2:end)))
             ext_ind = ixxx; break;
         end
     end
@@ -843,9 +852,9 @@ function new_plot(~,~,~)
         end
         font_color = [.873,.546,.347];
         h_new_plot_fig = figure('menubar','none','color',zeros(1,3),'numbertitle',...
-            'off','name','New Plot Settings','units','norm','Position',[.33,.32,.32,.40]);  % .25,.16,.51,.69
+            'off','name','New Plot Settings','units','norm','Position',[.3,.3,.4,.4]);  % .25,.16,.51,.69
         slices_txt = uicontrol('Style','text','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.05,.83,.42,.12],'FontName',...
+            'Units','normalized','Position',[.03,.82,.42,.14],'FontName',...
             'Helvetica','FontSize',12,'BackgroundColor',zeros(1,3),'String',...
             sprintf('Enter slice numbers \nseparated by commas:'),...
             'ForegroundColor',font_color,'FontWeight','bold','HorizontalAlignment','left'); %#ok
@@ -853,13 +862,14 @@ function new_plot(~,~,~)
             'Units','normalized','Position',[.51,.838,.46,.1],'FontName',...
             'Helvetica','FontSize',12);
         slice_dim_txt = uicontrol('Style','text','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.05,.69,.3,.07],'FontName',...
+            'Units','normalized','Position',[.03,.69,.3,.07],'FontName',...
             'Helvetica','FontSize',12,'BackgroundColor',zeros(1,3),'String',...
             'Slice Dimension:','ForegroundColor',font_color,'FontWeight',...
             'bold','HorizontalAlignment','left'); %#ok
         xpos = linspace(.07,.85,3);
+        % Slice dimension button group
         dim_bg = uibuttongroup('Visible','on','Units','normalized','Position',...
-            [.45,.678,.52,.1],'BackgroundColor',zeros(1,3),'BorderType','etchedin',... 
+            [.4,.678,.57,.1],'BackgroundColor',zeros(1,3),'BorderType','etchedin',... 
             'Parent',h_new_plot_fig);
         h_dim(1) = uicontrol(dim_bg,'Style','radiobutton','Units',...
             'normalized','Position',[xpos(1),.23,.12,.6],'HorizontalAlignment','center',...
@@ -875,67 +885,74 @@ function new_plot(~,~,~)
             'FontSize',10,'ForegroundColor',font_color,'FontWeight','bold');
         set(dim_bg,'SelectedObject',h_dim(3))
         mosaic_dim_txt = uicontrol('Style','text','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.05,.535,.35,.07],'FontName',...
+            'Units','normalized','Position',[.03,.535,.35,.07],'FontName',...
             'Helvetica','FontSize',12,'BackgroundColor',zeros(1,3),'String',...
             'Mosaic Dimension:','ForegroundColor',font_color,'FontWeight',...
             'bold','HorizontalAlignment','left'); %#ok
+        % Mosaic dimension text boxes
         num_rows_txt = uicontrol('Style','text','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.46,.54,.13,.06],'FontName',...
+            'Units','normalized','Position',[.51,.53,.13,.06],'FontName',...
             'Helvetica','FontSize',10,'BackgroundColor',zeros(1,3),'String',...
             '# Rows:','ForegroundColor',font_color,'FontWeight','bold'); %#ok
         num_cols_txt = uicontrol('Style','text','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.7,.54,.17,.06],'FontName',...
+            'Units','normalized','Position',[.73,.53,.17,.06],'FontName',...
             'Helvetica','FontSize',10,'BackgroundColor',zeros(1,3),'String',...
             '# Columns:','ForegroundColor',font_color,'FontWeight','bold'); %#ok
+        % Mosaic dimension edit texts
         num_rows_spec = uicontrol('Style','edit','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.6,.54,.06,.06],'FontName',...
+            'Units','normalized','Position',[.65,.54,.06,.06],'FontName',...
             'Helvetica','FontSize',10);
         num_cols_spec = uicontrol('Style','edit','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.88,.54,.06,.06],'FontName',...
+            'Units','normalized','Position',[.91,.54,.06,.06],'FontName',...
             'Helvetica','FontSize',10);
+        % Tile direction (column-wise, row-wise)
         tile_direction_txt = uicontrol('Style','text','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.05,.37,.25,.07],'FontName',...
+            'Units','normalized','Position',[.03,.37,.25,.07],'FontName',...
             'Helvetica','FontSize',12,'BackgroundColor',zeros(1,3),'String',...
             'Tile Direction:','ForegroundColor',font_color,'FontWeight',...
             'bold','HorizontalAlignment','left'); %#ok
+        % Tile direction button group
         tile_bg = uibuttongroup('Visible','on','Units','normalized','Position',...
-            [.45,.355,.52,.1],'BackgroundColor',zeros(1,3),'BorderType','etchedin',...
+            [.4,.355,.57,.1],'BackgroundColor',zeros(1,3),'BorderType','etchedin',...
             'Parent',h_new_plot_fig);
         h_tile_dir(1) = uicontrol(tile_bg,'Style','radiobutton','Units',...
-            'normalized','Position',[.05,.23,.45,.6],'HorizontalAlignment','center',...
+            'normalized','Position',[.15,.23,.45,.6],'HorizontalAlignment','center',...
             'BackgroundColor',zeros(1,3),'String','Column-wise','FontName',...
             'Helvetica','FontSize',10,'ForegroundColor',font_color,'FontWeight','bold');
         h_tile_dir(2) = uicontrol(tile_bg,'Style','radiobutton','Units',...
-            'normalized','Position',[.58,.23,.36,.6],'HorizontalAlignment','center',...
+            'normalized','Position',[.6,.23,.36,.6],'HorizontalAlignment','center',...
             'BackgroundColor',zeros(1,3),'String','Row-wise','FontName',...
             'Helvetica','FontSize',10,'ForegroundColor',font_color,'FontWeight','bold');
         set(tile_bg,'SelectedObject',h_tile_dir(1))
         slice_locator_txt = uicontrol('Style','text','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.05,.22,.25,.07],'FontName',...
+            'Units','normalized','Position',[.03,.22,.25,.07],'FontName',...
             'Helvetica','FontSize',12,'BackgroundColor',zeros(1,3),'String',...
             'Slice Locator:','ForegroundColor',font_color,'FontWeight',...
             'bold','HorizontalAlignment','left'); %#ok
         slice_locator_spec = uicontrol('Style','Checkbox','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.33,.235,.035,.045],'FontName',...
-            'Helvetica','FontSize',10,'BackgroundColor',zeros(1,3),'Value',1);
+            'Units','normalized','Position',[.47,.22,.035,.06],'FontName',...
+            'Helvetica','FontSize',10,'BackgroundColor',zeros(1,3),'Value',0);
+        % Slice locator position spec text
         slice_locator_row_txt = uicontrol('Style','text','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.49,.225,.1,.06],'FontName',...
+            'Units','normalized','Position',[.54,.21,.1,.06],'FontName',...
             'Helvetica','FontSize',10,'BackgroundColor',zeros(1,3),'String',...
             'Row:','ForegroundColor',font_color,'FontWeight','bold'); %#ok
         slice_locator_col_txt = uicontrol('Style','text','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.72,.225,.15,.06],'FontName',...
+            'Units','normalized','Position',[.75,.21,.15,.06],'FontName',...
             'Helvetica','FontSize',10,'BackgroundColor',zeros(1,3),'String',...
             'Column:','ForegroundColor',font_color,'FontWeight','bold'); %#ok
+        % Slice locator spec edit text
         slice_locator_row_spec = uicontrol('Style','edit','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.6,.225,.06,.06],'FontName',...
+            'Units','normalized','Position',[.65,.22,.06,.06],'FontName',...
             'Helvetica','FontSize',10,'BackgroundColor',ones(1,3),'String',...
             num_rows_spec.String);
         slice_locator_col_spec = uicontrol('Style','edit','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.88,.225,.06,.06],'FontName',...
+            'Units','normalized','Position',[.91,.22,.06,.06],'FontName',...
             'Helvetica','FontSize',10,'BackgroundColor',ones(1,3),'String',...
             num_cols_spec.String); 
+        % Plot UIbutton
         plot_button = uicontrol('Style','pushbutton','Parent',h_new_plot_fig,...
-            'Units','normalized','Position',[.4,.05,.2,.1],'FontName',...
+            'Units','normalized','Position',[.4,.06,.2,.1],'FontName',...
             'Helvetica','FontSize',12,'FontWeight','bold','BackgroundColor',font_color,...
             'String','Plot','ForegroundColor',zeros(1,3),'Callback',@run_new_plot); %#ok
     else
@@ -944,20 +961,38 @@ function new_plot(~,~,~)
 end
 
 function run_new_plot(~,~,~)
-    slices = str2double(strsplit(slices_spec.String,','));
+    if isempty(slices_spec.String)
+        findSlices
+    else
+        slices = str2double(strsplit(slices_spec.String,','));
+    end
     for ix = 1:3; if get(h_dim(ix),'Value'); break; end; end
     dimension = ix;
-    axes_dim(1) = str2double(num_rows_spec.String);
-    axes_dim(2) = str2double(num_cols_spec.String);
+    if ~isempty(num_rows_spec.String)
+        axes_dim(1) = str2double(num_rows_spec.String);
+    else
+        axes_dim(1) = 2;
+    end
+    if ~isempty(num_cols_spec.String)
+        axes_dim(2) = str2double(num_cols_spec.String);
+    else 
+        axes_dim(2) = 5;
+    end
+    
+    % Slice tile direction toggle
     if get(h_tile_dir(1),'Value')
         axes_direction = 2;
     elseif get(h_tile_dir(2),'Value')
         axes_direction = 1;
     end
+    
+    % Slice locator
     slice_locator_on = get(slice_locator_spec,'Value');
-    if isempty(slice_locator_row_spec.String) || isempty(slice_locator_col_spec.String)...
-            || ~isnumeric(str2double(slice_locator_row_spec.String)) || ~isnumeric(str2double(slice_locator_col_spec.String))
-%         slice_locator_pos = prod(axes_dim); 
+    if isempty(slice_locator_row_spec.String) ...
+        || isempty(slice_locator_col_spec.String) ...
+            || ~isnumeric(str2double(slice_locator_row_spec.String)) ...
+                || ~isnumeric(str2double(slice_locator_col_spec.String))
+        slice_locator_pos = prod(axes_dim); 
     else
         mat = false(axes_dim); 
         mat(str2double(slice_locator_row_spec.String),str2double(slice_locator_col_spec.String)) = true;
@@ -990,9 +1025,11 @@ function run_new_plot(~,~,~)
             delete(handles.overlay_axes(ix))  
         end
     end
+    
     if isgraphics(handles.slice_locator,'axes')
         delete(handles.slice_locator)
     end
+    
     numslices = length(slices);
     plot_mosaic(1)
 end
@@ -1050,7 +1087,7 @@ function change_tool(~, ~, which_tool)
     axes(handles.background_axes(1))
     rotate3d off; zoom off; pan off;
     switch which_tool
-        case 1, % Pan
+        case 1 % Pan
             if strcmp(h_tools(1).Checked,'on')
                 h_tools(1).Checked = 'off';
                 set(handles.figure,'WindowButtonDownFcn',[],'Pointer','arrow');
@@ -1058,7 +1095,7 @@ function change_tool(~, ~, which_tool)
                 h_tools(1).Checked = 'on';
                 set(handles.figure,'WindowButtonDownFcn',@cursor_click_callback,'Pointer','hand');
             end
-        case 2, % Zoom
+        case 2 % Zoom
             if strcmp(h_tools(2).Checked,'on')
                 h_tools(2).Checked = 'off';
                 set(handles.figure,'WindowScrollWheelFcn',[]);
@@ -1074,18 +1111,19 @@ function revert_view(~,~,~)
     ymin = 1; ymax = background_dim(2);
     for ix = 1:numslices
         switch dimension
-            case 1, 
+            case 1
                 background_slice = squeeze(imdat(slices(ix),:,:))';
                 set(handles.background_axes(ix),...
                     'XLim',[1,background_dim(3)],...
                     'YLim',[1,background_dim(2)]);
-            case 2, 
+            case 2
                 background_slice = squeeze(imdat(:,slices(ix),:))';
                 set(handles.background_axes(ix),...
                     'XLim',[1,background_dim(1)],...
                     'YLim',[1,background_dim(3)],...
                     'Xdir','reverse');
-            case 3, background_slice = squeeze(imdat(:,:,slices(ix)));
+            case 3
+                background_slice = squeeze(imdat(:,:,slices(ix)));
                 set(handles.background_axes(ix),...
                     'XLim',[1,background_dim(2)],...
                     'YLim',[1,background_dim(1)]);
@@ -1195,7 +1233,7 @@ end
 function change_axes_limits(~,~,which_axis,xlim,ylim)
     if nargin<4 % Callback functionality
         switch which_axis
-            case 1, % X-axis
+            case 1 % X-axis
                 prompt = {sprintf('Specify X-Limits \n\n Lower:'),'Upper:'};
                 dlg_title = 'X-Limits'; num_lines = [1,17;1,17]; 
                 answer = inputdlg(prompt,dlg_title,num_lines);
@@ -1210,7 +1248,7 @@ function change_axes_limits(~,~,which_axis,xlim,ylim)
                 if slice_locator_on
                     set(handles.slice_locator,'YLim',xlim);
                 end
-            case 2, % Y-axis
+            case 2 % Y-axis
                 prompt = {sprintf('Specify Y-Limits \n\n Lower:'),'Upper:'};
                 dlg_title = 'Y-Limits'; num_lines = [1,17;1,17]; 
                 answer = inputdlg(prompt,dlg_title,num_lines);
@@ -1263,16 +1301,16 @@ function change_axes_limits(~,~,which_axis,xlim,ylim)
 end
 
 function change_axis_color(~,~,which_color)
-    for ix = 1:3; h_ax_color(ix).Checked = 'off'; end; 
+    for ix = 1:3; h_ax_color(ix).Checked = 'off'; end 
     h_ax_color(which_color).Checked = 'on';
     switch which_color
-        case 1, % grey
+        case 1 % grey
             grid_color = [.15,.15,.15];
             axes_color = [.2,.2,.2];
-        case 2, % black
+        case 2 % black
             grid_color = zeros(1,3);
             axes_color = zeros(1,3);
-        case 3, % white
+        case 3 % white
             grid_color = ones(1,3);
             axes_color = ones(1,3);
     end
@@ -1291,7 +1329,7 @@ end
 function change_units(~,~,unit_type)
     if strcmp(h_units(unit_type).Checked,'off')
         switch unit_type
-            case 1, % Voxel
+            case 1 % Voxel
                 h_units(1).Checked = 'on';
                 h_units(2).Checked = 'off';
                 for ix = 1:numslices
@@ -1303,7 +1341,7 @@ function change_units(~,~,unit_type)
 %                     ylabel(handles.background_axes(ix),'Y'); 
 %                     zlabel(handles.background_axes(ix),'Z');
                 end
-            case 2, % Physical
+            case 2 % Physical
                 h_units(1).Checked = 'off';
                 h_units(2).Checked = 'on';
                 xtick = round(get(handles.background_axes(1),'XTick')'.*pixdim(1));
@@ -1360,7 +1398,8 @@ function change_slice_labels(hObject,~,change_pos,initial_call)
             otherwise
                 if nargin>2 && ~isempty(change_pos)
                     slice_label_pos = change_pos;
-                else return
+                else
+                    return
                 end
                 for ix = 1:length(h_slice_label_pos_menu)
                     set(h_slice_label_pos_menu(ix),'Checked','off')
@@ -1388,7 +1427,8 @@ function change_slice_labels(hObject,~,change_pos,initial_call)
                             curr_ax_pos(2)+.05*curr_ax_pos(4),.08*curr_ax_pos(3),.03];
             end
             switch slice_label_phys
-                case 1, curr_str = num2str(slices(ix));
+                case 1
+                    curr_str = num2str(slices(ix));
                 case 2 
                     slice_distances(ix) = abs((slices(ix)-parsed_inputs.origin_slice)*pixdim(dimension)); % change this back if want negative distances
                     curr_str = sprintf('%2.1f',round(slice_distances(ix),1)); % add this
@@ -1435,7 +1475,8 @@ function change_slice_labels_background(~,~,which_color)
             image(c_image,'Parent',ax_colorbar,'ButtonDownFcn',...
                 {@manual_select_labels_background_color,c_map});
             set(ax_colorbar,'XLim',[0,600],'YLim',[0,100])
-        else figure(h_overlay_colorbar_fig)
+        else
+            figure(h_overlay_colorbar_fig)
         end
     end
 end
@@ -1465,7 +1506,7 @@ function change_label_txt_color(~,~,which_color)
                     set(handles.h_slice_labels(ix),'Color',ones(1,3)); 
                 end
             end
-        case 3, % grey
+        case 3 % grey
             for ix = 1:numslices
                 if ishandle(handles.h_slice_labels(ix))
                     set(handles.h_slice_labels(ix),'Color',[.2,.2,.2]); 
@@ -1544,7 +1585,8 @@ function change_overlay_single_colors(~,~,which_color)
             c_image(:,:,3) = repmat(c_map(:,3)',100,1);
             image(c_image,'Parent',ax_colorbar,'ButtonDownFcn',{@manual_select_overlay_color,c_map});
             set(ax_colorbar,'XLim',[0,600],'YLim',[0,100])
-        else figure(h_overlay_colorbar_fig)
+        else
+            figure(h_overlay_colorbar_fig)
         end
     end
 end
@@ -1641,7 +1683,7 @@ end
 function load_new_background
     [background, background_path] = uigetfile({'*.nii';'*.nii.gz';'*.img'},...
         'Select a 3D image:','MultiSelect','off');
-    if background_path==0; % Cancel
+    if background_path==0 % Cancel
         disp('User cancelled action.'); 
         handles = []; 
         return; 
@@ -1659,9 +1701,9 @@ function load_new_background
         end
         imdat = back_img.img; 
         unit_code = back_img.hdr.dime.xyzt_units(1);
-        pixdim = back_img.hdr.dime.pixdim(2:4);
+        pixdim = back_img.hdr.dime.pixdim([3,2,4]);
         switch unit_code
-            case 0, physical_units = ''; %#ok
+            case 0, physical_units = ''; 
             case 1, physical_units = '(m)';
             case 2, physical_units = '(mm)';
             case 3, physical_units = '(microns)';
@@ -1680,7 +1722,7 @@ function h = neuroimage_overobj(Type)
 
     fig = matlab.ui.internal.getPointerWindow();
     % Look for quick exit
-    if fig==0,
+    if fig==0
        h = [];
        return
     end
@@ -1696,7 +1738,7 @@ function h = neuroimage_overobj(Type)
     x = (p(1)-figPos(1))/figPos(3);
     y = (p(2)-figPos(2))/figPos(4);
     c = findobj(get(fig,'Children'),'flat','Type',Type); % previously only searched visible objects
-    for h = c',
+    for h = c'
        hUnit = get(h,'Units');
        set(h,'Units','norm')
        r = get(h,'Position');

@@ -119,7 +119,7 @@ if ~isempty(background)
                 end
             end
             imdat = back_img.img; 
-            pixdim = back_img.hdr.dime.pixdim([3,2,4]);
+            pixdim = back_img.hdr.dime.pixdim([2,3,4]);
             % Determine Units:
             unit_code = back_img.hdr.dime.xyzt_units(1);
             switch unit_code
@@ -143,7 +143,7 @@ if ~isempty(background)
                 case 3, physical_units = '(microns)';
                 otherwise, physical_units = '';
             end
-            pixdim = background.hdr.dime.pixdim([3,2,4]);
+            pixdim = background.hdr.dime.pixdim([2,3,4]);
         otherwise
             if isnumeric(background)
                 imdat = background;
@@ -170,10 +170,17 @@ end
 imdat = permute(imdat,[2,1,3]);
 overlay_dat = permute(overlay_dat,[2,1,3]);
 background_dim = size(imdat);
-xmax = background_dim(2);
-ymax = background_dim(1);
 
+% Get slice dimensions
 dimension = parsed_inputs.dimension; % default 3; never empty
+slice_dim = [0,0];
+switch dimension
+    case 1, slice_dim = [background_dim(2), background_dim(3)];
+    case 2, slice_dim = [background_dim(1), background_dim(3)];
+    case 3, slice_dim = [background_dim(2), background_dim(1)];
+end
+xmax = slice_dim(1); ymax = slice_dim(2);
+
 axes_direction = parsed_inputs.axes_direction; % default 2 (column-wise); never empty
 slice_locator_on = parsed_inputs.slice_locator; % default 0 (off); never empty
 axes_dim = parsed_inputs.axes_dim; % default [2,5]; never empty (but adjust later if can't accomodate slices)
@@ -310,17 +317,9 @@ ax_pos = zeros(n_axes,4);
 slice_distances = zeros(1,numslices);
 
 % Initialize slice data containers
-switch dimension
-    case 1, background_slice_data = zeros(background_dim(3),background_dim(2),numslices);
-    case 2, background_slice_data = zeros(background_dim(3),background_dim(1),numslices);
-    case 3, background_slice_data = zeros(background_dim(1),background_dim(2),numslices);
-end
+background_slice_data = zeros(slice_dim(1),slice_dim(2),numslices);
 if overlay_on
-    switch dimension
-        case 1, overlay_slice_data = zeros(background_dim(3),background_dim(2),numslices);
-        case 2, overlay_slice_data = zeros(background_dim(3),background_dim(1),numslices);
-        case 3, overlay_slice_data = zeros(background_dim(1),background_dim(2),numslices);
-    end
+    overlay_slice_data = zeros(slice_dim(1),slice_dim(2),numslices);
 end
 
 h_colorbar_fig = 28.332737;
@@ -345,12 +344,23 @@ h_tile_dir = repmat(35.38848,1,2);
 slice_locator_spec = 35.38848;
 slice_locator_row_spec = 35.38848;
 slice_locator_col_spec = 35.38848;
-handles.h_slice_labels_rect = repmat(371.38389,1,numslices);
 handles.h_slice_labels = repmat(371.38389,1,numslices);
         
 %% FIGURE AND FILE MENUS:
 handles.figure = figure('menubar','none','color',background_color,'numbertitle',...
-    'off','name','','units','norm','Position',[.15,.099,.73,.802],'Pointer','hand');  % .25,.16,.51,.69
+    'off','name','','units','norm','Position',[0,0,1,1],'Pointer','hand');  % [.15,.099,.73,.802]
+
+% Try to maximize
+if verLessThan('matlab','9.4') % R2018a introduced WindowState feature
+    try 
+        jFrame = get(handles.figure, 'JavaFrame');
+        jFrame.setMaximized(1);   
+    catch
+    end
+else 
+    set(handles.figure, 'WindowState','maximized');
+end
+
 set(handles.figure,'WindowScrollWheelFcn',@scroll_zoom_callback);
 set(handles.figure,'WindowButtonDownFcn',@cursor_click_callback);
 % FILE MENUS:
@@ -592,8 +602,8 @@ function plot_mosaic(initial)
 %         rotate3d off
         % Add mesh for slice locations:
         mesh_step = 15;
-        mesh_coords_x = 1:mesh_step:background_dim(1); 
-        mesh_coords_y = 1:mesh_step:background_dim(2);
+        mesh_coords_x = 1:mesh_step:slice_dim(1); 
+        mesh_coords_y = 1:mesh_step:slice_dim(2);
         mesh_CData = zeros(length(mesh_coords_y),length(mesh_coords_x),3);
         for ix = 1:length(mesh_coords_y)
             for iy = 1:length(mesh_coords_x)
@@ -612,24 +622,21 @@ function plot_mosaic(initial)
             set(handles.background_axes(ix),'Visible','off');
         end
         switch dimension
-            case 1
-                background_slice = squeeze(imdat(slices(ix),:,:))';
-                set(handles.background_axes(ix),...
-                    'XLim',[1,background_dim(3)],...
-                    'YLim',[1,background_dim(2)]);
-            case 2
-                background_slice = squeeze(imdat(:,slices(ix),:))';
-                set(handles.background_axes(ix),...
-                    'XLim',[1,background_dim(1)],...
-                    'YLim',[1,background_dim(3)],...
-                    'Xdir','reverse');
-            case 3
-                background_slice = squeeze(imdat(:,:,slices(ix)));
-                set(handles.background_axes(ix),...
-                    'XLim',[1,background_dim(1)],...
-                    'YLim',[1,background_dim(2)]);
+            case 1, background_slice = squeeze(imdat(slices(ix),:,:))';
+                set(handles.background_axes(ix),'Xdir','normal')
+            case 2, background_slice = squeeze(imdat(:,slices(ix),:))';
+                set(handles.background_axes(ix),'Xdir','reverse')
+            case 3, background_slice = squeeze(imdat(:,:,slices(ix)));
+                set(handles.background_axes(ix),'Xdir','normal')
         end
-        background_slice_data(:,:,ix) = background_slice;
+        set(handles.background_axes(ix),...
+            'XLim',[1, slice_dim(1)],...
+            'YLim',[1, slice_dim(2)]);
+        if all(size(background_slice_data(:,:,ix)) == size(background_slice))
+            background_slice_data(:,:,ix) = background_slice;
+        else 
+            background_slice_data(:,:,ix) = background_slice';
+        end
         alpha_background = zeros(size(background_slice));
         alpha_background(background_slice>=background_thresh) = 1; 
         handles.background_images(ix) = imagesc(background_slice,'Parent',...
@@ -643,26 +650,28 @@ function plot_mosaic(initial)
             switch dimension
                 case 1
                     overlay_slice = squeeze(overlay_dat(slices(ix),:,:))';
-                    set(handles.overlay_axes(ix),...
-                        'XLim',[1,background_dim(3)],...
-                        'YLim',[1,background_dim(2)]);
+                    set(handles.overlay_axes(ix),'Xdir','normal')
                 case 2
                     overlay_slice = squeeze(overlay_dat(:,slices(ix),:))';
-                    set(handles.overlay_axes(ix),...
-                        'XLim',[1,background_dim(1)],...
-                        'YLim',[1,background_dim(3)],...
-                        'Xdir','reverse')
+                    set(handles.overlay_axes(ix),'Xdir','reverse')
                 case 3
                     overlay_slice = squeeze(overlay_dat(:,:,slices(ix)));
-                    set(handles.overlay_axes(ix),...
-                        'XLim',[1,background_dim(1)],...
-                        'YLim',[1,background_dim(2)]);
+                    set(handles.overlay_axes(ix),'Xdir','normal')
             end
+            set(handles.overlay_axes(ix),...
+                'XLim',[1, slice_dim(1)],...
+                'YLim',[1, slice_dim(2)]);
             alpha_slice = zeros(size(overlay_slice));
             alpha_slice(overlay_slice>overlay_clim(1)) = overlay_alpha;
 %             alpha_slice(overlay_slice>overlay_clim(2)) = 0;
             alpha_slice(background_slice<background_thresh) = 0;
-            overlay_slice_data(:,:,ix) = overlay_slice;
+            
+            if all(size(overlay_slice_data(:,:,ix)) == size(overlay_slice))
+                overlay_slice_data(:,:,ix) = overlay_slice;
+            else 
+                overlay_slice_data(:,:,ix) = overlay_slice';
+            end
+        
             % Scale Slice Data:
             if ~isempty(roi_colors)
                 handles.overlay_images(ix) = image(overlay_slice,'Parent',...
@@ -728,22 +737,23 @@ function scroll_zoom_callback(~, eventdata, ~)
     % Get mouse location
     curr_ax = neuroimage_overobj('axes'); % find which axes mouse is over
     if isempty(curr_ax); return; end
-    pt = get(curr_ax,'CurrentPoint'); if isempty(pt); return; end % returns [] if outside axes
+    pt = get(curr_ax,'CurrentPoint'); 
+    if isempty(pt); return; end % returns [] if outside axes
     pt = round(pt(1,1:2));
     % Check if Image Click
-    if pt(2) <= background_dim(1) && pt(2) > 0 && pt(1) <= background_dim(2) && pt(1) > 0
+    if pt(2) <= slice_dim(1) && pt(2) > 0 && pt(1) <= slice_dim(2) && pt(1) > 0
         scroll_count = min(max(scroll_count + -eventdata.VerticalScrollCount,0),9);
         if scroll_count ~= 0
             zoom_factor = scroll_zoom_equiv(scroll_count+1);
-            xlength = zoom_factor*background_dim(1); 
-            ylength = zoom_factor*background_dim(2);
+            xlength = zoom_factor * slice_dim(1); 
+            ylength = zoom_factor * slice_dim(2);
             xmin = max(round(pt(1)-.5*xlength),1);
-            xmax = min(round(pt(1)+.5*xlength),background_dim(1));
+            xmax = min(round(pt(1)+.5*xlength), slice_dim(1));
             ymin = max(round(pt(2)-.5*ylength),1);
-            ymax = min(round(pt(2)+.5*ylength),background_dim(2));
+            ymax = min(round(pt(2)+.5*ylength), slice_dim(2));
         else
-            xmin = 1; xmax = background_dim(1);
-            ymin = 1; ymax = background_dim(2);
+            xmin = 1; xmax = slice_dim(1);
+            ymin = 1; ymax = slice_dim(2);
         end
         for ix = 1:numslices
             set(handles.background_axes(ix),'XLim',[xmin,xmax],'YLim',[ymin,ymax]);
@@ -769,12 +779,15 @@ function cursor_motion_callback(~,~,~)
     % Get mouse location
     curr_ax = neuroimage_overobj('axes'); % find which axes mouse is over
     if isempty(curr_ax); return; end
-    pt = get(curr_ax,'CurrentPoint'); if isempty(pt); return; end % returns [] if outside axes
+    pt = get(curr_ax,'CurrentPoint'); 
+    if isempty(pt); return; end % returns [] if outside axes
     drag_click = round(pt(1,1:2));
     pan_dir = drag_click-first_click;
     pan_dir = -1.*pan_dir;
-    xmin = xmin+pan_dir(1); xmax = xmax+pan_dir(1);
-    ymin = ymin+pan_dir(2); ymax = ymax+pan_dir(2);
+    xmin = xmin+pan_dir(1); 
+    xmax = xmax+pan_dir(1);
+    ymin = ymin+pan_dir(2); 
+    ymax = ymax+pan_dir(2);
     for ix = 1:numslices
         set(handles.background_axes(ix),'XLim',[xmin,xmax],'YLim',[ymin,ymax]);
         if overlay_on && isgraphics(handles.overlay_axes(ix),'axes')
@@ -968,6 +981,13 @@ function run_new_plot(~,~,~)
     end
     for ix = 1:3; if get(h_dim(ix),'Value'); break; end; end
     dimension = ix;
+    slice_dim = [0,0];
+    switch dimension
+        case 1, slice_dim = [background_dim(3), background_dim(4)];
+        case 2, slice_dim = [background_dim(2), background_dim(4)];
+        case 3, slice_dim = [background_dim(2), background_dim(3)];
+    end
+    xmax = slice_dim(1); ymax = slice_dim(2);
     if ~isempty(num_rows_spec.String)
         axes_dim(1) = str2double(num_rows_spec.String);
     else
@@ -1107,47 +1127,45 @@ function change_tool(~, ~, which_tool)
 end
 
 function revert_view(~,~,~)
-    xmin = 1; xmax = background_dim(1);
-    ymin = 1; ymax = background_dim(2);
+    xmin = 1; xmax = slice_dim(1);
+    ymin = 1; ymax = slice_dim(2);
     for ix = 1:numslices
         switch dimension
             case 1
                 background_slice = squeeze(imdat(slices(ix),:,:))';
-                set(handles.background_axes(ix),...
-                    'XLim',[1,background_dim(3)],...
-                    'YLim',[1,background_dim(2)]);
+                set(handles.background_axes(ix),'Xdir','normal');
             case 2
                 background_slice = squeeze(imdat(:,slices(ix),:))';
-                set(handles.background_axes(ix),...
-                    'XLim',[1,background_dim(1)],...
-                    'YLim',[1,background_dim(3)],...
-                    'Xdir','reverse');
+                set(handles.background_axes(ix),'Xdir','reverse');
             case 3
                 background_slice = squeeze(imdat(:,:,slices(ix)));
-                set(handles.background_axes(ix),...
-                    'XLim',[1,background_dim(2)],...
-                    'YLim',[1,background_dim(1)]);
+                set(handles.background_axes(ix),'Xdir','normal');
         end
+        set(handles.background_axes(ix),...
+            'XLim',[1, slice_dim(1)],...
+            'YLim',[1, slice_dim(2)]);
+        
         alpha_background = zeros(size(background_slice));
         alpha_background(background_slice>background_thresh) = 1; 
         set(handles.background_images(ix),'CData',background_slice,...
             'AlphaDataMapping','none','AlphaData',alpha_background);
+        
         if overlay_on
             switch dimension
-                case 1, overlay_slice = squeeze(overlay_dat(slices(ix),:,:))';
-                    set(handles.overlay_axes(ix),...
-                        'XLim',[1,background_dim(3)],...
-                        'YLim',[1,background_dim(2)]);
-                case 2, overlay_slice = squeeze(overlay_dat(:,slices(ix),:))';
-                    set(handles.overlay_axes(ix),...
-                        'XLim',[1,background_dim(1)],...
-                        'YLim',[1,background_dim(3)],...
-                        'Xdir','reverse')
-                case 3, overlay_slice = squeeze(overlay_dat(:,:,slices(ix)));
-                    set(handles.overlay_axes(ix),...
-                        'XLim',[1,background_dim(2)],...
-                        'YLim',[1,background_dim(1)]);
+                case 1
+                    overlay_slice = squeeze(overlay_dat(slices(ix),:,:))';
+                    set(handles.overlay_axes(ix),'Xdir','normal')
+                case 2
+                    overlay_slice = squeeze(overlay_dat(:,slices(ix),:))';
+                    set(handles.overlay_axes(ix),'Xdir','reverse')
+                case 3
+                    overlay_slice = squeeze(overlay_dat(:,:,slices(ix)));
+                    set(handles.overlay_axes(ix),'Xdir','normal')
             end
+            set(handles.overlay_axes(ix),...
+                'XLim',[1, slice_dim(1)],...
+                'YLim',[1, slice_dim(2)]);
+            
             alpha_slice = zeros(size(overlay_slice));
             alpha_slice(overlay_slice>overlay_clim(1)) = overlay_alpha; 
             set(handles.overlay_images(ix),'CData',overlay_slice,...
@@ -1409,39 +1427,56 @@ function change_slice_labels(hObject,~,change_pos,initial_call)
     end
     if slice_labels_on
         for ix = 1:numslices
-%             if ishandle(handles.h_slice_labels_rect(ix)); delete(handles.h_slice_labels_rect(ix)); end
-%             if ishandle(handles.h_slice_labels(ix)); delete(handles.h_slice_labels(ix)); end
             curr_ax_pos = ax_pos(ix,:);
             switch slice_label_pos
-                case 1, annot_pos = [curr_ax_pos(1)+.03*curr_ax_pos(3),...
-                            curr_ax_pos(2)+.93*curr_ax_pos(4),.08*curr_ax_pos(3),.03];
-                case 2, annot_pos = [curr_ax_pos(1)+.46*curr_ax_pos(3),...
-                            curr_ax_pos(2)+.93*curr_ax_pos(4),.08*curr_ax_pos(3),.03];
-                case 3, annot_pos = [curr_ax_pos(1)+.91*curr_ax_pos(3),...
-                            curr_ax_pos(2)+.93*curr_ax_pos(4),.08*curr_ax_pos(3),.03]; 
-                case 4, annot_pos = [curr_ax_pos(1)+.03*curr_ax_pos(3),...
-                            curr_ax_pos(2)+.05*curr_ax_pos(4),.08*curr_ax_pos(3),.03];
-                case 5, annot_pos = [curr_ax_pos(1)+.44*curr_ax_pos(3),...
-                            curr_ax_pos(2)+.05*curr_ax_pos(4), .14*curr_ax_pos(3), .04];
-                case 6, annot_pos = [curr_ax_pos(1)+.91*curr_ax_pos(3),...
-                            curr_ax_pos(2)+.05*curr_ax_pos(4),.08*curr_ax_pos(3),.03];
+                case 1 
+                    annot_pos = [curr_ax_pos(1)+.07*curr_ax_pos(3),...
+                                curr_ax_pos(2)+.93*curr_ax_pos(4),...
+                                .08*curr_ax_pos(3),...
+                                .03];
+                case 2
+                    annot_pos = [curr_ax_pos(1)+.5*curr_ax_pos(3),...
+                                curr_ax_pos(2)+.93*curr_ax_pos(4),...
+                                .08*curr_ax_pos(3),...
+                                .03];
+                case 3
+                    annot_pos = [curr_ax_pos(1)+.86*curr_ax_pos(3),...
+                                curr_ax_pos(2)+.93*curr_ax_pos(4),...
+                                .08*curr_ax_pos(3),...
+                                .03]; 
+                case 4
+                    annot_pos = [curr_ax_pos(1)+.07*curr_ax_pos(3),...
+                                curr_ax_pos(2),...
+                                .08*curr_ax_pos(3),...
+                                .03];
+                case 5
+                    annot_pos = [curr_ax_pos(1)+.44*curr_ax_pos(3),...
+                                curr_ax_pos(2),...
+                                .14*curr_ax_pos(3),...
+                                .04];
+                case 6
+                    annot_pos = [curr_ax_pos(1)+.86*curr_ax_pos(3),...
+                                curr_ax_pos(2),...
+                                .08*curr_ax_pos(3),...
+                                .03];
             end
             switch slice_label_phys
                 case 1
                     curr_str = num2str(slices(ix));
                 case 2 
-                    slice_distances(ix) = abs((slices(ix)-parsed_inputs.origin_slice)*pixdim(dimension)); % change this back if want negative distances
-                    curr_str = sprintf('%2.1f',round(slice_distances(ix),1)); % add this
+                    slice_distances(ix) = (slices(ix)-parsed_inputs.origin_slice)*pixdim(dimension); 
+                    curr_str = sprintf('%2.1f',round(slice_distances(ix),1));
             end
             if nargin>3 && initial_call
-                handles.h_slice_labels_rect(ix) = annotation('rectangle','Position',annot_pos,'FaceColor','none');
                 handles.h_slice_labels(ix) = annotation('textbox','Position',annot_pos,...
                     'String',curr_str,'FontName','Helvetica','FontSize',14,...
                     'EdgeColor','none','HorizontalAlignment','center',...
-                    'VerticalAlignment','middle', 'color','w');
+                    'VerticalAlignment','middle', 'color','w',...
+                    'FitBoxToText','on','Margin',0);
             else
-                set(handles.h_slice_labels_rect(ix),'Position',annot_pos);
-                set(handles.h_slice_labels(ix),'Position',annot_pos,'String',curr_str,'FontSize',16)
+                set(handles.h_slice_labels(ix),'Position',annot_pos,...
+                    'String',curr_str,'FontSize',14,'HorizontalAlignment','center',...
+                    'FitBoxToText','on','Margin',0)
             end
         end
     end
@@ -1452,15 +1487,15 @@ function change_slice_labels_background(~,~,which_color)
     h_slice_label_background_color(which_color).Checked = 'on';
     if which_color==1
         for ix = 1:numslices
-            if ishandle(handles.h_slice_labels_rect(ix))
-                set(handles.h_slice_labels_rect(ix),'FaceColor','none','Color','none','FaceAlpha',0)
+            if ishandle(handles.h_slice_labels(ix))
+                set(handles.h_slice_labels(ix),'BackgroundColor','none')
             end
         end
     elseif which_color < 10
         cmap = annotation_background_colors(which_color,:);
         for ix = 1:numslices
-            if ishandle(handles.h_slice_labels_rect(ix))
-                set(handles.h_slice_labels_rect(ix),'FaceColor',cmap,'Color',zeros(1,3),'FaceAlpha',1)
+            if ishandle(handles.h_slice_labels(ix))
+                set(handles.h_slice_labels(ix),'BackgroundColor',cmap)
             end
         end
     else
@@ -1486,8 +1521,8 @@ function manual_select_labels_background_color(~,~,c_map)
     xpos = round(pt(1,1));
     use_color = c_map(xpos,:);
     for ix = 1:numslices
-        if ishandle(handles.h_slice_labels_rect(ix))
-            set(handles.h_slice_labels_rect(ix),'FaceColor',use_color,'Color',zeros(1,3),'FaceAlpha',1)
+        if ishandle(handles.h_slice_labels(ix))
+            set(handles.h_slice_labels(ix),'BackgroundColor',use_color)
         end
     end
 end
@@ -1701,7 +1736,7 @@ function load_new_background
         end
         imdat = back_img.img; 
         unit_code = back_img.hdr.dime.xyzt_units(1);
-        pixdim = back_img.hdr.dime.pixdim([3,2,4]);
+        pixdim = back_img.hdr.dime.pixdim([2,3,4]);
         switch unit_code
             case 0, physical_units = ''; 
             case 1, physical_units = '(m)';

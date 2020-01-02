@@ -648,7 +648,6 @@ function load_img(img_type)
     % Parse image input
     window_name = ['NIfTI Studio:    ',filename];
     set(handles.figure,'Name',window_name);  
-    d=0
     dim = img.hdr.dime.dim; 
     pixdim = img.hdr.dime.pixdim; 
     voxSize = pixdim(2:4);
@@ -892,14 +891,10 @@ function sort_exts(path1,name1)
 end
 
 function resizeFigure
-    if slice_orientation == 3
-        aspect_ratio = (xwidth*(1/x_ax_percent))/(yheight*(1/y_ax_percent));
-    else
-        aspect_ratio = (xwidth*(1/y_ax_percent))/(yheight*(1/x_ax_percent));
-    end
+    aspect_ratio = (xwidth*(1/x_ax_percent))/(yheight*(1/y_ax_percent));
     fig_width = aspect_ratio*fig_height;
-    figure_pos(1) = max(screen_res(1)+8,screen_mid_x-(.5*fig_width));
-    figure_pos(3) = min(screen_res(3)-figure_pos(1)-7,fig_width);
+    figure_pos(1) = max(screen_res(1)+8, screen_mid_x-(.5*fig_width));
+    figure_pos(3) = min(screen_res(3)-figure_pos(1)-7, fig_width);
     handles.figure.Position = figure_pos;
 end
 
@@ -1187,8 +1182,8 @@ function reorient_callback(hObject, ~, ~)
             else
                 return;
             end
-            xwidth = dim(4)*pixdim(4);
-            yheight = dim(3)*pixdim(3);
+            xwidth = dim(2)*pixdim(2);
+            yheight = dim(4)*pixdim(4);
         case 'Sagittal' % (2)
             set(menu_orientations(2),'Checked','on')
             if slice_orientation~=2
@@ -1208,8 +1203,8 @@ function reorient_callback(hObject, ~, ~)
             else
                 return;
             end
-            xwidth = dim(4)*pixdim(4);
-            yheight = dim(2)*pixdim(2);
+            xwidth = dim(3)*pixdim(3);
+            yheight = dim(4)*pixdim(4);
         case 'Axial' % (3)
             set(menu_orientations(3),'Checked','on')
             if slice_orientation~=3

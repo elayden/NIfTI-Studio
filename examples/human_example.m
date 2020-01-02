@@ -1,5 +1,5 @@
 % Define NIfTI Studio toolbox base path:
-nifti_studio_path = 'C:\Users\PC-3PO\Desktop\NIfTI-Studio';
+nifti_studio_path = 'NIfTI-Studio'; % Insert custom path to repo here
 
 % Full paths to grey matter (GM) and white matter (WM) images:
 GM_path = fullfile(nifti_studio_path, '\data\human\mni_icbm152_gm_tal_nlin_sym_09a.nii');
@@ -10,7 +10,7 @@ GM = load_nii(GM_path); % NIfTI_tools function
 GM.img(GM.img < .5) = 0;
 save_nii(GM, fullfile(nifti_studio_path, '\data\human\mni_GM_thresh.nii')) % NIfTI_tools function
 
-% Open image with main NIfTI Studio editor
+%% Open image with main NIfTI Studio editor
 handles = nifti_studio('background', GM); %#ok % load from previously loaded image structure
 
 % handles = nifti_studio('background', ...
@@ -23,7 +23,7 @@ handles = nifti_studio('background', GM); %#ok % load from previously loaded ima
     % Click on image to generate spherical ROI
     % Save drawing as overlay: Save -> Save Current Overlay -> 'spherical_rois.nii'
 
-% Plot 3D rendered image w/ spherical ROIs and connectivity data:
+%% Plot 3D rendered image w/ spherical ROIs and connectivity data:
     % Note: this cnn also be accomplished within the nifti_studio GUI:
     % Display -> Orientation -> 3D Display
 
@@ -37,7 +37,11 @@ handles = nifti_studio_3D('background', GM, ...
     'ROI', fullfile(nifti_studio_path, '\data\human\spherical_rois.nii'),...
     'connmat', connmat); %#ok
 
-% Plot mosaic of slices:
+% Desired output:  human_brain_3d_rois_connections.png
+
+%% Plot mosaic of slices:
 handles = nifti_studio_mosaic('background', GM, ...
     'overlay', fullfile(nifti_studio_path, '\data\human\spherical_rois.nii'),...
-    'dimension',1);
+    'dimension',3);
+
+% Desired output:  human_brain_mosaic_axial.png

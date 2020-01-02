@@ -157,6 +157,15 @@ function [handles] = nifti_studio_3D(varargin)
 % 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Waitbar:
+h_wait = waitbar(0, 'Please wait...', 'Name', 'NIfTI Studio 3D');
+try
+    wbch = allchild(h_wait);
+    jp = wbch(1).JavaPeer;
+    jp.setIndeterminate(1);
+catch
+end
+
 % Identify Function Path and Add Helper Scripts:
 script_fullpath = mfilename('fullpath');
 [script_path,~,~] = fileparts(script_fullpath);
@@ -172,7 +181,7 @@ parsed_inputs = struct('background',[],'background_colors',[],'ROI',[],...
     'background_color',[1,1,1],'lock_axes',1,'show_axes',1,'show_grid',0,...
     'axes_color',.2*ones(1,3),'grid_color',.15*ones(1,3),'unit_measure',[],...
     'physical_units','','brightness',1,'light_axis','x','background_alpha',...
-    .5,'roi_alpha',.6,'edge_alpha',1,'background_smoothness',5,...
+    .5,'roi_alpha',.8,'edge_alpha',1,'background_smoothness',5,...
     'roi_smoothness',3,'edge_thickness',7,'edge_cmap',[],'edge_color',[],...
     'sphere_size',[],'roi_type',[],'menu_on',1,'pitch',0,'yaw',0,'roll',0,...
     'xlim',[],'ylim',[],'zlim',[],'edge_colors',[],'isovalue',.5,...
@@ -507,6 +516,7 @@ else
     handles.figure = get(parsed_inputs.insert_axes,'Parent');
     set(handles.figure,'color',background_color);
 end
+
 if parsed_inputs.menu_on
     file_menu = uimenu(handles.figure,'Label','File');
         uimenu(file_menu,'Label','Save Figure','Callback',@save_figure_callback);
@@ -956,17 +966,6 @@ if brightness~=1
     end
 end
 
-% Change X-Lim, Y-Lim, Z-Lim if requested:
-if ~isempty(parsed_inputs.xlim)
-    change_axes_limits([],[],[],parsed_inputs.xlim,[],[]);
-end
-if ~isempty(parsed_inputs.ylim)
-    change_axes_limits([],[],[],[],parsed_inputs.ylim,[]);
-end
-if ~isempty(parsed_inputs.zlim)
-    change_axes_limits([],[],[],[],[],parsed_inputs.zlim);
-end
-
 % Change Edge Colors if specified:
 if ~isempty(parsed_inputs.edge_colors) && isnumeric(parsed_inputs.edge_colors)
     % upgrade this function
@@ -1012,9 +1011,25 @@ if ~isempty(parsed_inputs.edge_colors) && isnumeric(parsed_inputs.edge_colors)
 %     end
 end
 
+% Change X-Lim, Y-Lim, Z-Lim if requested:
+if ~isempty(parsed_inputs.xlim)
+    change_axes_limits([],[],[],parsed_inputs.xlim,[],[]);
+end
+if ~isempty(parsed_inputs.ylim)
+    change_axes_limits([],[],[],[],parsed_inputs.ylim,[]);
+end
+if ~isempty(parsed_inputs.zlim)
+    change_axes_limits([],[],[],[],[],parsed_inputs.zlim);
+end
+
 % Print: this must go last (after all other operations)
 if ~isempty(parsed_inputs.print)
     print_callback([],[],1)
+end
+
+% Delete waitbar
+if exist('h_wait','var') && ~isempty(h_wait) && ishandle(h_wait)
+    delete(h_wait)
 end
 
 %% Callbacks:

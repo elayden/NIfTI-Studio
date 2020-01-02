@@ -63,6 +63,15 @@ function [handles] = nifti_studio_mosaic(varargin)
 %                    Middle, (6) = Bottom Right
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Waitbar:
+h_wait = waitbar(0, 'Please wait...', 'Name', 'NIfTI Studio Mosaic');
+try
+    wbch = allchild(h_wait);
+    jp = wbch(1).JavaPeer;
+    jp.setIndeterminate(1);
+catch
+end
+            
 % Identify Function Path and Add Helper Scripts:
 script_fullpath = mfilename('fullpath');
 [script_path,~,~] = fileparts(script_fullpath);
@@ -92,6 +101,8 @@ poss_input = {'background','overlay','slices','title',...
     'print_res','show_axes','background_thresh','unit_measure','physical_units',...
     'xlim','ylim','slice_labels','slice_label_phys','slice_label_pos',...
     'overlay_3D', 'origin_slice','light_axis'};
+
+m = 200; % # of colormap entries
 
 for i = 1:length(poss_input)
     ind = find(strcmp(poss_input{i},inputs));
@@ -269,7 +280,7 @@ overlay_alpha = parsed_inputs.overlay_alpha;
 background_cmap = parsed_inputs.background_cmap;
 % background_caxis = parsed_inputs.background_caxis;
 if isstring(parsed_inputs.overlay_cmap)
-    overlay_cmap = eval([parsed_inputs.overlay_cmap,'(300)']);
+    overlay_cmap = eval([parsed_inputs.overlay_cmap,'(',num2str(m),')']);
 elseif ismatrix(parsed_inputs.overlay_cmap)
     overlay_cmap = parsed_inputs.overlay_cmap;
 else
@@ -277,7 +288,7 @@ else
 end
 overlay_clim = parsed_inputs.overlay_clim;
 if isempty(overlay_clim) && overlay_on
-    overlay_clim = [0,max(overlay_dat(:))];
+    overlay_clim = [0, max(overlay_dat(:))];
 end 
 roi_colors = parsed_inputs.roi_colors;
 if ~isempty(roi_colors) 
@@ -294,7 +305,6 @@ opacity_options = {'Opaque','90%','80%','70%','60%','50%','40%','30%','20%','10%
 imdat(isnan(imdat)) = background_thresh;
 if overlay_on; overlay_dat(isnan(overlay_dat)) = background_thresh; end
 mesh_color = parsed_inputs.mesh_color;
-m = 100; % # of colormap entries
 scroll_zoom_equiv = [1,.9,.8,.7,.6,.5,.4,.3,.2,.1];
 scroll_count = 0;
 xmin = 1; ymin = 1;
@@ -363,7 +373,13 @@ end
 
 set(handles.figure,'WindowScrollWheelFcn',@scroll_zoom_callback);
 set(handles.figure,'WindowButtonDownFcn',@cursor_click_callback);
+
+
 % FILE MENUS:
+color_spectrums = {'Blue-White-Red', 'Red-Blue', 'jet', 'hot', 'cool', ...
+    'hsv', 'bone', 'colorcube', 'copper', 'spring', 'summer', ...
+    'winter', 'pink', 'gray'};
+
 file_menu = uimenu(handles.figure,'Label','File');
     uimenu(file_menu,'Label','Save Figure','Callback',@save_figure_callback);
     uimenu(file_menu,'Label','Print','Callback',{@print_callback,0});
@@ -451,20 +467,11 @@ if overlay_on
             end
         overlay_colors_menu = uimenu(overlay_menu,'Label','Color Scheme');
             overlay_color_spectrum_menu = uimenu(overlay_colors_menu,'Label','Color Spectrum');
-                h_overlay_color_spec(1) = uimenu(overlay_color_spectrum_menu,'Label','Blue-White-Red','Callback',{@overlay_colormap_callback,1});
-                h_overlay_color_spec(2) = uimenu(overlay_color_spectrum_menu,'Label','Red-Blue','Callback',{@overlay_colormap_callback,2});
-                h_overlay_color_spec(3) = uimenu(overlay_color_spectrum_menu,'Label','jet','Callback',{@overlay_colormap_callback,3});
-                h_overlay_color_spec(4) = uimenu(overlay_color_spectrum_menu,'Label','hot','Callback',{@overlay_colormap_callback,4});
-                h_overlay_color_spec(5) = uimenu(overlay_color_spectrum_menu,'Label','cool','Callback',{@overlay_colormap_callback,5});
-                h_overlay_color_spec(6) = uimenu(overlay_color_spectrum_menu,'Label','hsv','Callback',{@overlay_colormap_callback,6});
-                h_overlay_color_spec(7) = uimenu(overlay_color_spectrum_menu,'Label','bone','Callback',{@overlay_colormap_callback,7});
-                h_overlay_color_spec(8) = uimenu(overlay_color_spectrum_menu,'Label','colorcube','Callback',{@overlay_colormap_callback,8});
-                h_overlay_color_spec(9) = uimenu(overlay_color_spectrum_menu,'Label','copper','Callback',{@overlay_colormap_callback,9});
-                h_overlay_color_spec(10) = uimenu(overlay_color_spectrum_menu,'Label','spring','Callback',{@overlay_colormap_callback,10});
-                h_overlay_color_spec(11) = uimenu(overlay_color_spectrum_menu,'Label','summer','Callback',{@overlay_colormap_callback,11});
-                h_overlay_color_spec(12) = uimenu(overlay_color_spectrum_menu,'Label','winter','Callback',{@overlay_colormap_callback,12});
-                h_overlay_color_spec(13) = uimenu(overlay_color_spectrum_menu,'Label','pink','Callback',{@overlay_colormap_callback,13});
-                h_overlay_color_spec(14) = uimenu(overlay_color_spectrum_menu,'Label','gray','Callback',{@overlay_colormap_callback,14});
+                for i = 1:length(color_spectrums)
+                    h_overlay_color_spec(i) = uimenu(overlay_color_spectrum_menu,...
+                        'Label',color_spectrums{i}, ...
+                        'Callback',{@overlay_colormap_callback,i});
+                end
             overlay_single_colors_menu = uimenu(overlay_colors_menu,'Label','Single Color');
                 h_overlay_single_colors(1) = uimenu(overlay_single_colors_menu,'Label','Red','Callback',{@change_overlay_single_colors,1});
                 h_overlay_single_colors(2) = uimenu(overlay_single_colors_menu,'Label','Blue','Callback',{@change_overlay_single_colors,2});
@@ -500,6 +507,18 @@ if parsed_inputs.customize
     new_plot([], [], 1)
 else
     plot_mosaic(1)
+end
+
+% Adjust colormap:
+if any(strcmp(parsed_inputs.overlay_cmap, color_spectrums))
+    overlay_colormap_callback(parsed_inputs.overlay_cmap, [], find(strcmp(parsed_inputs.overlay_cmap, color_spectrums)))
+else
+    warning('Input ''overlay_cmap'' not found as option.')
+end
+
+% Delete waitbar
+if exist('h_wait','var') && ~isempty(h_wait) && ishandle(h_wait)
+    delete(h_wait)
 end
 
 %% Begin plotting
@@ -1638,7 +1657,11 @@ end
 function overlay_colormap_callback(hObject,~,which_color)
     for ix = 1:14; h_overlay_color_spec(ix).Checked = 'off'; end
     h_overlay_color_spec(which_color).Checked = 'on';
-    cmap_name = get(hObject,'Label');
+    if ishandle(hObject)
+        cmap_name = get(hObject,'Label');
+    elseif ischar(hObject)
+        cmap_name = hObject;    
+    end
     switch cmap_name
         case 'Blue-White-Red'
             cmap = bluewhitered(m,overlay_clim(1),overlay_clim(2));
@@ -1655,7 +1678,8 @@ function overlay_colormap_callback(hObject,~,which_color)
         for ix = 1:numslices
 %             overlay_slice = get(handles.overlay_images(ix),'CData');
             overlay_slice = overlay_slice_data(:,:,ix);
-            m = 100; overlay_vec = overlay_slice(:);
+            m = 200; 
+            overlay_vec = overlay_slice(:);
             ind_nan = ((overlay_vec<=overlay_clim(1))+(overlay_vec>overlay_clim(2)))>0;
             overlay_vec = min(m,round((m-1).*(overlay_vec-overlay_clim(1))./(overlay_clim(2)-overlay_clim(1)))+1);
             overlay_vec(overlay_vec<=0) = 1; % assure no negative or 0 indices

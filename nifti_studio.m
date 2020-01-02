@@ -1229,13 +1229,6 @@ function reorient_callback(hObject, ~, ~)
             
         case {'3D Display', 'Mosaic'}
             
-            % Waitbar:
-            h_wait = waitbar(0, 'Please wait. This could take a few minutes...');
-            set(h_wait, 'Name', reorient_type) % '3D Rendering'
-            wbch = allchild(h_wait);
-            jp = wbch(1).JavaPeer;
-            jp.setIndeterminate(1);
-            
             % Change mouse pointer for busy
             pointer = get(handles.figure, 'Pointer');
             set(handles.figure, 'Pointer', 'watch')
@@ -1312,11 +1305,6 @@ function reorient_callback(hObject, ~, ~)
             % Change mouse pointer back
             set(handles.figure, 'Pointer', pointer)
             drawnow
-            
-            % Delete waitbar
-            if exist('h_wait','var') && ~isempty(h_wait) && ishandle(h_wait)
-                delete(h_wait)
-            end
             return
             
     end

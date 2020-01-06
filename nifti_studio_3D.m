@@ -1373,7 +1373,7 @@ function change_axes_limits(~,~,which_axis,xlim,ylim,zlim)
                 error('Input ''xlim'' should be a vector of length 2.')
             end
             for ix = 1:n_axes
-                set(handles.axes(ix),'XLim',xlim.*pixdim(1));
+                set(handles.axes(ix),'XLim',xlim); % .*pixdim(1)
             end
         end
         if ~isempty(ylim)
@@ -1381,7 +1381,7 @@ function change_axes_limits(~,~,which_axis,xlim,ylim,zlim)
                 error('Input ''ylim'' should be a vector of length 2.')
             end
             for ix = 1:n_axes
-                set(handles.axes(ix),'YLim',ylim.*pixdim(2));
+                set(handles.axes(ix),'YLim',ylim); % .*pixdim(2)
             end 
         end 
         if ~isempty(zlim)
@@ -1389,7 +1389,7 @@ function change_axes_limits(~,~,which_axis,xlim,ylim,zlim)
                 error('Input ''zlim'' should be a vector of length 2.')
             end
             for ix = 1:n_axes
-                set(handles.axes(ix),'ZLim',zlim.*pixdim(3));
+                set(handles.axes(ix),'ZLim',zlim); % .*pixdim(3)
             end
         end 
     end

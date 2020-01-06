@@ -8,12 +8,13 @@ Code:  NIfTI-Studio/examples/human_example.m
 
 ### Slice mosaic of human MNI brain template segmented grey matter (GM) with ROIs
 Code:  NIfTI-Studio/examples/human_example.m
-![Human Example - 3D](https://github.com/elayden/NIfTI-Studio/blob/dev/examples/human_brain_mosaic_axial.png)
+![Human Example - Mosaic](https://github.com/elayden/NIfTI-Studio/blob/dev/examples/human_brain_mosaic_axial.png)
 
 ### 3D rendering of zebra finch brain template with ROIs and functional connectivity
 Code:  NIfTI-Studio/examples/zebra_finch_example.m
-![Human Example - 3D](https://github.com/elayden/NIfTI-Studio/blob/dev/examples/zebra_finch_brain_3d_rois_connections.png)
+<p float="left" align="middle">
+  <img align="left" src="https://github.com/elayden/NIfTI-Studio/blob/dev/examples/zebra_finch_brain_3d_rois_connections.png" width="350" hspace="20" /> <img align="right" src="https://github.com/elayden/NIfTI-Studio/blob/dev/examples/zebra_finch_brain_3d_rois_connections_2.png"  width="350 hspace="20" /> </p>
 
 ### Slice mosaic of zebra finch brain template with ROIs
 Code:  NIfTI-Studio/examples/zebra_finch_example.m
-![Human Example - 3D](https://github.com/elayden/NIfTI-Studio/blob/dev/examples/zebra_finch_brain_mosaic_coronal.png)
+![Zebra Finch Example - Mosaic](https://github.com/elayden/NIfTI-Studio/blob/dev/examples/zebra_finch_brain_mosaic_coronal.png)

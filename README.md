@@ -4,7 +4,7 @@ A Matlab toolbox for NIfTI plotting, editing, and 3D rendering
 ## Examples
 ### 3D rendering of human MNI brain template with regions of interest (ROIs) and connections
 Code:  NIfTI-Studio/examples/human_example.m
-![Human Example - 3D](https://github.com/elayden/NIfTI-Studio/blob/dev/examples/human_brain_3d_rois_connections.png)
+<p align="middle"><img align="middle" src="https://github.com/elayden/NIfTI-Studio/blob/dev/examples/human_brain_3d_rois_connections.png" width="850 hspace="20" /> </p>    
 
 ### Slice mosaic of human MNI brain template segmented grey matter (GM) with ROIs
 Code:  NIfTI-Studio/examples/human_example.m

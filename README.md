@@ -13,7 +13,7 @@ Code:  NIfTI-Studio/examples/human_example.m
 ### 3D rendering of zebra finch brain template with ROIs and functional connectivity
 Code:  NIfTI-Studio/examples/zebra_finch_example.m
 
-<p align="middle"><img align="left" src="https://github.com/elayden/NIfTI-Studio/blob/dev/examples/zebra_finch_brain_3d_rois_connections.png" width="350" hspace="60" /> <img align="left" src="https://github.com/elayden/NIfTI-Studio/blob/dev/examples/zebra_finch_brain_3d_rois_connections_2.png" width="350 hspace="60" />                                                                                                                  </p>           
+<p align="middle"><img align="left" src="https://github.com/elayden/NIfTI-Studio/blob/dev/examples/zebra_finch_brain_3d_rois_connections.png" width="380" hspace="20" /> <img align="left" src="https://github.com/elayden/NIfTI-Studio/blob/dev/examples/zebra_finch_brain_3d_rois_connections_2.png" width="380 hspace="20" />                                                                                                                  </p>           
   
 ### Slice mosaic of zebra finch brain template with ROIs
 Code:  NIfTI-Studio/examples/zebra_finch_example.m

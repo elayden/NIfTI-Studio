@@ -891,7 +891,7 @@ function sort_exts(path1,name1)
 end
 
 function resizeFigure
-    aspect_ratio = (xwidth*(1/x_ax_percent))/(yheight*(1/y_ax_percent));
+    aspect_ratio = (xwidth/x_ax_percent)/(yheight/y_ax_percent);    
     fig_width = aspect_ratio*fig_height;
     figure_pos(1) = max(screen_res(1)+8, screen_mid_x-(.5*fig_width));
     figure_pos(3) = min(screen_res(3)-figure_pos(1)-7, fig_width);

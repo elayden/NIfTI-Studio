@@ -186,20 +186,33 @@ end
 % Permute x- and y-dimensions for display
 imdat = permute(imdat,[2,1,3]);
 overlay_dat = permute(overlay_dat,[2,1,3]);
+pixdim = pixdim([2,1,3]);
 background_dim = size(imdat);
 
 % Get slice dimensions
 dimension = parsed_inputs.dimension; % default 3; never empty
-slice_dim = [0,0];
-switch dimension
-    case 1
-        slice_dim = [background_dim(2), background_dim(3)];
-    case 2
-        slice_dim = [background_dim(1), background_dim(3)];
-    case 3
-        slice_dim = [background_dim(2), background_dim(1)];
+slice_dim = zeros(1,3); slice_pixdim = zeros(1,3);
+xmax = 0; ymax = 0;
+getSliceDimensions(dimension)
+
+set(0,'units','pixels'); 
+screen_res = get(0,'ScreenSize'); % initialize for later resizeFigure
+
+function getSliceDimensions(dim)
+    slice_dim = [0,0];
+    switch dim
+        case 1
+            slice_dim = [background_dim(2), background_dim(3), background_dim(1)];
+            slice_pixdim = [pixdim(2), pixdim(3), pixdim(1)];
+        case 2
+            slice_dim = [background_dim(1), background_dim(3), background_dim(2)];
+            slice_pixdim = [pixdim(1), pixdim(3), pixdim(2)];
+        case 3
+            slice_dim = [background_dim(2), background_dim(1), background_dim(3)];
+            slice_pixdim = [pixdim(2), pixdim(1), pixdim(3)];
+    end
+    xmax = slice_dim(1); ymax = slice_dim(2);
 end
-xmax = slice_dim(1); ymax = slice_dim(2);
 
 axes_direction = parsed_inputs.axes_direction; % default 2 (column-wise); never empty
 slice_locator_on = parsed_inputs.slice_locator; % default 0 (off); never empty
@@ -369,16 +382,16 @@ handles.h_slice_labels = repmat(371.38389,1,numslices);
 handles.figure = figure('menubar','none','color',background_color,'numbertitle',...
     'off','name','','units','norm','Position',[0,0,1,1],'Pointer','hand');  % [.15,.099,.73,.802]
 
-% Try to maximize
-if verLessThan('matlab','9.4') % R2018a introduced WindowState feature
-    try 
-        jFrame = get(handles.figure, 'JavaFrame');
-        jFrame.setMaximized(1);   
-    catch
-    end
-else 
-    set(handles.figure, 'WindowState','maximized');
-end
+% % Try to maximize
+% if verLessThan('matlab','9.4') % R2018a introduced WindowState feature
+%     try 
+%         jFrame = get(handles.figure, 'JavaFrame');
+%         jFrame.setMaximized(1);   
+%     catch
+%     end
+% else 
+%     set(handles.figure, 'WindowState','maximized');
+% end
 
 set(handles.figure,'WindowScrollWheelFcn',@scroll_zoom_callback);
 set(handles.figure,'WindowButtonDownFcn',@cursor_click_callback);
@@ -725,6 +738,9 @@ function plot_mosaic(initial)
                 'direct','FaceAlpha',.3,'EdgeAlpha',0,'FaceColor','Interp');
         end
     end
+    
+    % Resize figure based on ratio of x- and y- axes
+    resizeFigure
 end
 
 rotate3d off
@@ -1009,13 +1025,8 @@ function run_new_plot(~,~,~)
     end
     for ix = 1:3; if get(h_dim(ix),'Value'); break; end; end
     dimension = ix;
-    slice_dim = [0,0];
-    switch dimension
-        case 1, slice_dim = [background_dim(3), background_dim(4)];
-        case 2, slice_dim = [background_dim(2), background_dim(4)];
-        case 3, slice_dim = [background_dim(2), background_dim(3)];
-    end
-    xmax = slice_dim(1); ymax = slice_dim(2);
+    getSliceDimensions(dimension)
+    
     if ~isempty(num_rows_spec.String)
         axes_dim(1) = str2double(num_rows_spec.String);
     else
@@ -1749,11 +1760,12 @@ end
 %% ADDITIONAL UTILITIES:
 
 function resizeFigure
-    aspect_ratio = (xwidth*(1/x_ax_percent))/(yheight*(1/y_ax_percent));
-    fig_width = aspect_ratio*fig_height;
-    figure_pos(1) = max(screen_res(1)+8, screen_mid_x-(.5*fig_width));
-    figure_pos(3) = min(screen_res(3)-figure_pos(1)-7, fig_width);
-    handles.figure.Position = figure_pos;
+    aspect_ratio = (slice_dim(1) * slice_pixdim(1) / ax_pos(3)) / (slice_dim(2) * slice_pixdim(2) / ax_pos(4));
+    if aspect_ratio > 1
+        set(handles.figure, 'position', [0, .5*(1-(1/aspect_ratio)), 1, 1/aspect_ratio])
+    else
+        set(handles.figure, 'position', [.5*(1-aspect_ratio), 0, aspect_ratio, 1])
+    end
 end
 
 function load_new_background

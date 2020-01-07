@@ -1025,7 +1025,6 @@ function run_new_plot(~,~,~)
     end
     for ix = 1:3; if get(h_dim(ix),'Value'); break; end; end
     dimension = ix;
-    getSliceDimensions(dimension)
     
     if ~isempty(num_rows_spec.String)
         axes_dim(1) = str2double(num_rows_spec.String);
@@ -1089,7 +1088,16 @@ function run_new_plot(~,~,~)
         delete(handles.slice_locator)
     end
     
+    % Get new slice dimensions
+    getSliceDimensions(dimension)
     numslices = length(slices);
+    
+    % Re-initialize slice data containers
+    background_slice_data = zeros(slice_dim(1),slice_dim(2),numslices);
+    if overlay_on
+        overlay_slice_data = zeros(slice_dim(1),slice_dim(2),numslices);
+    end
+
     plot_mosaic(1)
 end
 

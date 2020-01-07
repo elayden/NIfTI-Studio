@@ -71,7 +71,13 @@ try
     jp.setIndeterminate(1);
 catch
 end
-            
+     
+function clearWaitbar
+    if exist('h_wait','var') && ~isempty(h_wait) && ishandle(h_wait)
+        delete(h_wait)
+    end
+end
+
 % Identify Function Path and Add Helper Scripts:
 script_fullpath = mfilename('fullpath');
 [script_path,~,~] = fileparts(script_fullpath);
@@ -89,7 +95,7 @@ parsed_inputs = struct('background',[],'overlay',[],...
     'background_caxis',[],'overlay_clim',[],'overlay_cmap','jet',...
     'roi_colors',[],'axis_ticks',1,...
     'background_color',zeros(1,3),'mesh_color',[0,0,1],'print',[],'print_res',300,...
-    'show_axes',0,'background_thresh',0,'unit_measure',[],'physical_units','',...
+    'show_axes',0,'background_thresh',0.00001,'unit_measure',[],'physical_units','',...
     'xlim',[],'ylim',[],'slice_labels',1,'slice_label_phys',1,...
     'slice_label_pos',5,'overlay_3D',0, 'origin_slice', 1,'light_axis','x');
 
@@ -186,9 +192,12 @@ background_dim = size(imdat);
 dimension = parsed_inputs.dimension; % default 3; never empty
 slice_dim = [0,0];
 switch dimension
-    case 1, slice_dim = [background_dim(2), background_dim(3)];
-    case 2, slice_dim = [background_dim(1), background_dim(3)];
-    case 3, slice_dim = [background_dim(2), background_dim(1)];
+    case 1
+        slice_dim = [background_dim(2), background_dim(3)];
+    case 2
+        slice_dim = [background_dim(1), background_dim(3)];
+    case 3
+        slice_dim = [background_dim(2), background_dim(1)];
 end
 xmax = slice_dim(1); ymax = slice_dim(2);
 
@@ -374,7 +383,6 @@ end
 set(handles.figure,'WindowScrollWheelFcn',@scroll_zoom_callback);
 set(handles.figure,'WindowButtonDownFcn',@cursor_click_callback);
 
-
 % FILE MENUS:
 color_spectrums = {'Blue-White-Red', 'Red-Blue', 'jet', 'hot', 'cool', ...
     'hsv', 'bone', 'colorcube', 'copper', 'spring', 'summer', ...
@@ -394,8 +402,8 @@ display_menu = uimenu(handles.figure,'Label','Display');
     background_options_menu = uimenu(display_menu,'Label','Background');
         uimenu(background_options_menu,'Label','Background Threshold','Callback',@change_background_thresh);
         background_color_menu = uimenu(background_options_menu,'Label','Background Color');
-            h_background(1) = uimenu(background_color_menu,'Label','White','Checked','on','Callback',{@change_background,1});
-            h_background(2) = uimenu(background_color_menu,'Label','Black','Callback',{@change_background,2});
+            h_background(1) = uimenu(background_color_menu,'Label','White','Callback',{@change_background,1});
+            h_background(2) = uimenu(background_color_menu,'Label','Black','Checked','on','Callback',{@change_background,2});
             h_background(3) = uimenu(background_color_menu,'Label','Aqua','Callback',{@change_background,3});
             h_background(4) = uimenu(background_color_menu,'Label','Blue','Callback',{@change_background,4});
             h_background(5) = uimenu(background_color_menu,'Label','Red','Callback',{@change_background,5});
@@ -467,6 +475,7 @@ if overlay_on
             end
         overlay_colors_menu = uimenu(overlay_menu,'Label','Color Scheme');
             overlay_color_spectrum_menu = uimenu(overlay_colors_menu,'Label','Color Spectrum');
+                h_overlay_color_spec = zeros(1,length(color_spectrums));
                 for i = 1:length(color_spectrums)
                     h_overlay_color_spec(i) = uimenu(overlay_color_spectrum_menu,...
                         'Label',color_spectrums{i}, ...
@@ -510,16 +519,16 @@ else
 end
 
 % Adjust colormap:
-if any(strcmp(parsed_inputs.overlay_cmap, color_spectrums))
-    overlay_colormap_callback(parsed_inputs.overlay_cmap, [], find(strcmp(parsed_inputs.overlay_cmap, color_spectrums)))
-else
-    warning('Input ''overlay_cmap'' not found as option.')
+if overlay_on
+    if any(strcmp(parsed_inputs.overlay_cmap, color_spectrums))
+        overlay_colormap_callback(parsed_inputs.overlay_cmap, [], find(strcmp(parsed_inputs.overlay_cmap, color_spectrums)))
+    else
+        warning('Input ''overlay_cmap'' not found as option.')
+    end
 end
 
 % Delete waitbar
-if exist('h_wait','var') && ~isempty(h_wait) && ishandle(h_wait)
-    delete(h_wait)
-end
+clearWaitbar
 
 %% Begin plotting
 function plot_mosaic(initial)
@@ -1738,6 +1747,14 @@ function mesh_edge_opacity_callback(~, ~, which_alpha)
 end
 
 %% ADDITIONAL UTILITIES:
+
+function resizeFigure
+    aspect_ratio = (xwidth*(1/x_ax_percent))/(yheight*(1/y_ax_percent));
+    fig_width = aspect_ratio*fig_height;
+    figure_pos(1) = max(screen_res(1)+8, screen_mid_x-(.5*fig_width));
+    figure_pos(3) = min(screen_res(3)-figure_pos(1)-7, fig_width);
+    handles.figure.Position = figure_pos;
+end
 
 function load_new_background
     [background, background_path] = uigetfile({'*.nii';'*.nii.gz';'*.img'},...

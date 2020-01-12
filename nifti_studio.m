@@ -407,8 +407,8 @@ if isempty(parsed_inputs.axes)
         'Callback',@crosshair_callback, 'Checked','on');
     tool_draw = uimenu(tools_menu,'Label','Draw                                ''d''',...
         'Callback',@draw_callback);
-    tool_zoom = uimenu(tools_menu,'Label','Zoom                               ''z''',...
-        'Callback',@zoom_callback);
+%     tool_zoom = uimenu(tools_menu,'Label','Zoom                               ''z''',...
+%         'Callback',@zoom_callback);
     tool_pan = uimenu(tools_menu,'Label','Pan                                   ''p''',...
         'Callback',@pan_callback);
 
@@ -899,12 +899,12 @@ function resizeFigure
 end
 
 function getSettings
-    listing = dir(fullfile(script_path,'nifti_studio_settings.txt'));
+    listing = dir(fullfile(script_path, 'helpers', 'nifti_studio_settings.txt'));
     if isempty(listing)
-        disp('No customized settings file found: missing file ''nifti_studio_settings.txt''.')
-        return;
+        disp('No customized settings file found:  missing file ''nifti_studio_settings.txt''.')
+        return
     end
-    gui_settings = importdata(fullfile(script_path,listing(1).name));
+    gui_settings = importdata(fullfile(script_path, 'helpers', listing(1).name));
     for ix1 = 1:length(gui_settings)
         ind = strfind(gui_settings{ix1},'=');
         eval([customizable{ix1}, '=[', gui_settings{ix1}(ind+1:end),'];']);
@@ -931,7 +931,7 @@ function write_settings
     gui_settings = char(gui_settings);
     
     % Write as Text File:
-    fileID = fopen(fullfile(script_path,'nifti_studio_settings.txt'),'w');
+    fileID = fopen(fullfile(script_path, 'helpers', 'nifti_studio_settings.txt'),'w');
     for ix1 = 1:6
         fprintf(fileID,'%s\r\n',gui_settings(ix1,:));
     end
@@ -1010,6 +1010,13 @@ function status = openNewBackground(~,~,~)
         status = 0; 
     end
     
+    % Clear Undo/Redo cache:
+    undoCache = struct('selectedImage', [], 'action', [], ...
+        'orientation', [], 'idx', [], 'color', [], 'alpha', []);
+    redoCache = struct('selectedImage', [], 'action', [], ...
+        'orientation', [], 'idx', [], 'color', [], 'alpha', []);
+           
+    crosshair_callback
 end
 
 % "Save" Button Callback:
@@ -1515,15 +1522,15 @@ end
 function adjustToolsCheckmarks(whichTool)
     set(tool_crosshair,'Checked','off')
     set(tool_draw,'Checked','off')
-    set(tool_zoom,'Checked','off')
+%     set(tool_zoom,'Checked','off')
     set(tool_pan,'Checked','off')
     switch whichTool
         case 1
             set(tool_crosshair,'Checked','on')
         case 2
             set(tool_draw,'Checked','on')
-        case 3
-            set(tool_zoom,'Checked','on')
+%         case 3
+%             set(tool_zoom,'Checked','on')
         case 4
             set(tool_pan,'Checked','on')
     end 
@@ -1554,7 +1561,7 @@ end
 
 % Tools menu callbacks:
 function crosshair_callback(~,~,~)
-    zoom off
+%     zoom off
     dcm_obj = datacursormode(handles.figure);
     set(dcm_obj, 'Enable', 'on', 'UpdateFcn', @dataCursorCallback)
 
@@ -1603,7 +1610,7 @@ function draw_callback(~,~,~)
     datacursormode(handles.figure, 'off');
     delete(findall(handles.figure,'Type','hggroup'));
     
-    zoom off
+%     zoom off
     draw_on = true;
     pan_on = false;
     set(handles.figure,'pointer','cross'); 
@@ -1616,33 +1623,33 @@ function draw_callback(~,~,~)
 %     set(handles.figure, 'currentaxes', handles.axes{selectedImage}); 
 end
 
-function zoom_callback(~,~,~)
-    % Turn off and clear any remaining data tips
-    datacursormode(handles.figure, 'off');
-    delete(findall(handles.figure,'Type','hggroup'));
-    
-    zoom on; 
-    draw_on = false;
-    pan_on = false;
-    
-    % Set pointer to hand (pan on only adjusts after motion):
-    % https://undocumentedmatlab.com/blog/undocumented-mouse-pointer-functions
-    setptr(handles.figure, 'glassplus');
-    
-    % Disable callback hijack
-    disableInteractiveModeHijack(3)
-
-    % Adjust checkmarks
-    adjustToolsCheckmarks(3)
-    
-end
+% function zoom_callback(~,~,~)
+%     % Turn off and clear any remaining data tips
+%     datacursormode(handles.figure, 'off');
+%     delete(findall(handles.figure,'Type','hggroup'));
+%     
+%     zoom on; 
+%     draw_on = false;
+%     pan_on = false;
+%     
+%     % Set pointer to hand (pan on only adjusts after motion):
+%     % https://undocumentedmatlab.com/blog/undocumented-mouse-pointer-functions
+%     setptr(handles.figure, 'glassplus');
+%     
+%     % Disable callback hijack
+%     disableInteractiveModeHijack(3)
+% 
+%     % Adjust checkmarks
+%     adjustToolsCheckmarks(3)
+%     
+% end
 
 function pan_callback(~,~,~)
     % Turn off and clear any remaining data tips
     datacursormode(handles.figure, 'off');
     delete(findall(handles.figure,'Type','hggroup'));
     
-    zoom off;
+%     zoom off;
     draw_on = false;
     pan_on = true;
     
@@ -1683,9 +1690,16 @@ end
 function undoCallback(~, ~, ~)
 
     if undoNum==0; return; end
+    
+    % Check if overlay has been deleted
+    if length(imageData) < undoCache(undoNum).selectedImage || isempty(imageData{undoCache(undoNum).selectedImage})
+        undoCache(undoNum).selectedImage = 1;
+        undoCache(undoNum).action = NaN;
+        undoNum = undoNum - 1;
+        return
+    end
         
     % Update or initialize redoCache
-    undoCache(undoNum)
     if undoNum == length(undoCache) % first undo
         if undoCache(undoNum).selectedImage==1
             redoCache = struct('selectedImage', undoCache(undoNum).selectedImage, ...
@@ -1738,6 +1752,16 @@ end
 function redoCallback(~,~,~)
     
     if numel(redoCache) == 0; return; end
+    
+    % Check if overlay has been deleted
+    if undoNum~=0 && ~isempty(redoCache) && length(redoCache) >= undoNum
+        if length(imageData) < redoCache(undoNum).selectedImage ...
+            || (length(imageData) >= redoCache(undoNum).selectedImage ...
+            && isempty(imageData{redoCache(undoNum).selectedImage}))
+            undoNum = min(undoNum + 1, length(undoCache));
+            return
+        end
+    end
     
     % Move forward to most recent redo
     if strcmp(redoCache(end).action, 'draw')
@@ -1944,8 +1968,8 @@ function keypress_callback(varargin)
             crosshair_callback
         case 'd'
             draw_callback
-        case 'z'
-            zoom_callback
+%         case 'z'
+%             zoom_callback
         case 'p'
             pan_callback
     end     
@@ -2220,18 +2244,21 @@ function closeOverlay(~, ~, closeWhich)
     end
     
     if closeWhich > 1
-        if length(handles.images) >= closeWhich && ishandle(handles.images{closeWhich})
+        if length(handles.images) >= closeWhich && ~isempty(handles.images{closeWhich}) && ishandle(handles.images{closeWhich})
             delete(handles.images{closeWhich})
             handles.images{closeWhich} = [];
         end
-        if length(handles.axes) >= closeWhich && isgraphics(handles.axes{closeWhich})
+        if length(handles.axes) >= closeWhich && ~isempty(handles.axes{closeWhich}) && isgraphics(handles.axes{closeWhich})
             delete(handles.axes{closeWhich})
             handles.axes{closeWhich} = [];
         end
         
         % Shift left:
-        delete(h_image(closeWhich))
-        delete(h_close(closeWhich))
+        try
+            delete(h_image(closeWhich))
+            delete(h_close(closeWhich))
+        catch
+        end
         
         imageData{closeWhich} = []; 
         alphaData{closeWhich} = []; 
@@ -2239,14 +2266,14 @@ function closeOverlay(~, ~, closeWhich)
         
         cmax{closeWhich} = []; 
         cmin{closeWhich} = [];  
-        
+       
         % Change selectedImage to nearest non-empty
         if selectedImage==closeWhich
             selectedImage = find(~isempty(imageData));
             selectedImage = max(selectedImage);
             changeSelection([], [], selectedImage)
         end
-       
+        
         updateImage
     else
         warning('No overlays are currently loaded.')

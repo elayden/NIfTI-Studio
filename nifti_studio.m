@@ -4,7 +4,7 @@ function [handles] = nifti_studio(varargin)
 %   (file types: .nii, .nii.gz, .img/.hdr)
 % 
 % Author:
-%   Elliot Layden, The University of Chicago, 2016-19
+%   Elliot A. Layden, The University of Chicago, 2016-19
 % 
 % Cite: 
 %   Layden, E. A. (2019). NIfTI Studio: A Matlab Toolbox for MRI Image 
@@ -540,7 +540,9 @@ if ~isempty(parsed_inputs.overlay)
     end
 end
 
-% Resize Figure Window Based on Aspect Ratio of Image:
+% Adjust colormap of background image based on input
+selectedImageHolder = selectedImage;
+selectedImage = 1;
 if ~isempty(parsed_inputs.colormap)
     if ismember(parsed_inputs.colormap, colormap_opts) 
         colormap_callback([], [], find(strcmp(parsed_inputs.colormap, colormap_opts)))
@@ -550,6 +552,7 @@ if ~isempty(parsed_inputs.colormap)
 else
     colormap_callback([], [], find(strcmp(colorMapStr{selectedImage}, colormap_opts)))
 end
+selectedImage = selectedImageHolder;
 set(handles.figure,'Visible','on'); % Make Visible
 
 % Adjust CAXES if specified:

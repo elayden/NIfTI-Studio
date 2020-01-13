@@ -1795,10 +1795,9 @@ function status = load_new_background
             end
         end
         imdat = back_img.img; 
-        unit_code = back_img.hdr.dime.xyzt_units(1);
         pixdim = back_img.hdr.dime.pixdim([2,3,4]);
-        switch unit_code
-            case 0, physical_units = ''; 
+        origin = back_img.hdr.originator;
+        switch bitand(back_img.hdr.dime.xyzt_units, 7) % see xform_nii.m, extra_nii_hdr.m
             case 1, physical_units = '(m)';
             case 2, physical_units = '(mm)';
             case 3, physical_units = '(microns)';

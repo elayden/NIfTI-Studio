@@ -218,6 +218,8 @@ cmin = {0}; cmax = {0};
 img = []; 
 fullPaths = {[]}; % stores full paths of background and overlay images
 
+origin = [];
+physical_units = [];
 filename = []; fpath = []; aspect_ratio = []; fig_width = []; dimperm = [];
 draw_on = false; pan_on = false;
 window_name = []; dim = []; pixdim = []; voxSize = []; xwidth = []; yheight = [];
@@ -499,8 +501,6 @@ if isempty(parsed_inputs.axes)
 %     end
 end
 
-crosshair_callback
-
 %% Customizations
 
 % Must run to initialize axes etc., prior to the subsequent lines
@@ -607,6 +607,25 @@ function load_img(img_type)
             end
     end
     
+    % Determine voxel units & origin:
+    d=0
+    try
+        origin = img.hdr.hist.originator(1:3);
+        switch bitand(img.hdr.dime.xyzt_units, 7) % see xform_nii.m, extra_nii_hdr.m
+            case 1, physical_units = 'm';
+            case 2, physical_units = 'mm';
+            case 3, physical_units = 'microns';
+            otherwise, physical_units = '';
+        end
+    catch
+        physical_units = '';
+        origin = img.hdr.dime.dim(2:4)/2;
+        warning('Failed to retrieve voxel units.')
+    end
+    if any(origin==0)
+       origin = img.hdr.dime.dim(2:4)/2;
+    end
+            
     % Change selected image back to background:
     if selectedImage ~= 1
         changeSelection([], [], 1)
@@ -640,6 +659,8 @@ function load_img(img_type)
     yheight = dim(3)*pixdim(3); 
     imageData = {single(img.img)}; % conversion may enhance refresh speed
     imageData{1} = permute(imageData{1},[2,1,3]); % Match SPM View
+    voxSize = voxSize([2,1,3]); % d=0
+    origin = origin([2,1,3]);
     [xdim, ydim, zdim] = size(imageData{1});
     middle_slice = round(zdim/2); 
     curr_slice = middle_slice;
@@ -1327,7 +1348,8 @@ function reorient_callback(hObject, ~, ~)
     end
     [xdim, ydim, zdim] = size(imageData{1}); 
     voxSize = voxSize(dimperm);
-
+    origin = origin(dimperm);
+    
     % Determine possible combinations of x,y indices:
     poss_ind = zeros(xdim*ydim,2); count = 0;
     for ix = 1:xdim
@@ -1589,21 +1611,33 @@ function output_txt = dataCursorCallback(~, event_obj)
     pt = get(event_obj, 'Position');
     
     % Format text:
-    output_txt = ['Background: [',...
+%     output_txt = ['Background: [',...
+%         num2str(yind(pt(1))), ', ',...
+%         num2str(xind(pt(2))), ', ',...
+%         num2str(curr_slice),', ',...
+%         num2str(imageData{1}(xind(pt(2)),yind(pt(1)),curr_slice)), ']'];
+
+    output_txt = ['[',...
+        num2str(round((yind(pt(1))-origin(2)) * voxSize(2),2)), ', ',...
+        num2str(round((xind(pt(2))-origin(1)) * voxSize(1),2)), ', ',...
+        num2str(round((curr_slice - origin(3)) * voxSize(3),2)),'] ',...
+        physical_units, '\n[',...
         num2str(yind(pt(1))), ', ',...
         num2str(xind(pt(2))), ', ',...
-        num2str(curr_slice),', ',...
-        num2str(imageData{1}(xind(pt(2)),yind(pt(1)),curr_slice)), ']'];
+        num2str(curr_slice),'] vox',...
+        '\nBackground:  ',num2str(round(imageData{1}(xind(pt(2)),yind(pt(1)),curr_slice),2))];
     
     % Add overlay text:
     if numel(imageData) > 1
         for i = 2:length(imageData)
             if ~isempty(imageData{i})
-                output_txt = [output_txt, '\nOverlay ',num2str(i-1),': [',...
-                    num2str(yind(pt(1))), ', ',...
-                    num2str(xind(pt(2))), ', ',...
-                    num2str(curr_slice),', ',...
-                    num2str(imageData{i}(xind(pt(2)),yind(pt(1)),curr_slice)), ']']; %#ok
+%                 output_txt = [output_txt, '\nOverlay ',num2str(i-1),': [',...
+%                     num2str(yind(pt(1))), ', ',...
+%                     num2str(xind(pt(2))), ', ',...
+%                     num2str(curr_slice),', ',...
+%                     num2str(imageData{i}(xind(pt(2)),yind(pt(1)),curr_slice)), ']']; %#ok
+                output_txt = [output_txt, '\nOverlay ',num2str(i-1),':  ',...
+                        num2str(round(imageData{i}(xind(pt(2)),yind(pt(1)),curr_slice),2))]; %#ok
             end
         end
     end

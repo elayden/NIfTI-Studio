@@ -312,7 +312,7 @@ prev_alpha = [];
 customizable = {'colorbar_on','title_on','axis_tick_on',...
     'extensions','last_nav_dir','colorMapStr'};
 first_dir = pwd; last_nav_dir = pwd; 
-extensions = {'*.img';'*.nii';'*nii.gz'};
+extensions = {'*.img';'*.nii';'*.nii.gz'};
 slice_orientation = 3; % default = z-dim
 h_title = 10.48487; num_voxels_crop = 0; 
 scroll_zoom_equiv = [1,.9,.8,.7,.6,.5,.4,.3,.2,.1];
@@ -943,7 +943,7 @@ function revert_defaults(~,~,~)
     colorbar_on = 1;                                                                                             
     title_on = 1;                                                                                             
     axis_tick_on = 1;                                                                                         
-    extensions = {'*.img';'*.nii';'*nii.gz'};                                                                 
+    extensions = {'*.img';'*.nii';'*.nii.gz'};                                                                 
     last_nav_dir = first_dir;
     
     save_selected = selectedImage;
@@ -990,7 +990,7 @@ function closereq_no_dlg(~, ~, ~)
 end
 
 % "Open" Callback:
-function status = openNewBackground(~,~,~)
+function status = openNewBackground(~,~,isCallback)
     
     % Get input filename:
     cd(last_nav_dir); 
@@ -1017,11 +1017,20 @@ function status = openNewBackground(~,~,~)
     redoCache = struct('selectedImage', [], 'action', [], ...
         'orientation', [], 'idx', [], 'color', [], 'alpha', []);
     
-    % Assure orientation menu reverts to axial:
-    for i = 1:length(menu_orientations)
-        set(menu_orientations(i), 'Checked','off'); 
+    if nargin == 3 && isCallback
+        % Assure orientation menu reverts to axial:
+        for i = 1:length(menu_orientations)
+            if ishandle(menu_orientations(i))
+                set(menu_orientations(i), 'Checked','off'); 
+            end
+        end
+        if ishandle(menu_orientations(3))
+            set(menu_orientations(3),'Checked','on');
+        end
+
+        % Clear 
+        colorMapStr = {'gray'}; 
     end
-    set(menu_orientations(3),'Checked','on');
 
 end
 
@@ -1088,7 +1097,7 @@ function saveas_callback(~, ~, save_type)
     cd(last_nav_dir);
     [filename, PathName] = uiputfile(extensions, 'Specify filename:');
     cd(first_dir);
-    
+   
     % Check whether canceled
     if ~ischar(filename); return; end
     if isdir(PathName); last_nav_dir = PathName; end %#ok

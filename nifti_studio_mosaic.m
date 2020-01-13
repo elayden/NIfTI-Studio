@@ -462,8 +462,8 @@ display_menu = uimenu(handles.figure,'Label','Display');
         h_slice_label_pos_menu(6) = uimenu(h_slice_labels_position_menu,'Label','Bottom Right','Callback',{@change_slice_labels,6});
         set(h_slice_label_pos_menu(slice_label_pos),'Checked','on')
     h_slice_labels_background_menu = uimenu(slice_labels_menu,'Label','Background Color');
-        h_slice_label_background_color(1) = uimenu(h_slice_labels_background_menu,'Label','None','Callback',{@change_slice_labels_background,1});
-        h_slice_label_background_color(2) = uimenu(h_slice_labels_background_menu,'Label','Red','Checked','on','Callback',{@change_slice_labels_background,2});
+        h_slice_label_background_color(1) = uimenu(h_slice_labels_background_menu,'Label','None','Checked','on','Callback',{@change_slice_labels_background,1});
+        h_slice_label_background_color(2) = uimenu(h_slice_labels_background_menu,'Label','Red','Callback',{@change_slice_labels_background,2});
         h_slice_label_background_color(3) = uimenu(h_slice_labels_background_menu,'Label','Blue','Callback',{@change_slice_labels_background,3});
         h_slice_label_background_color(4) = uimenu(h_slice_labels_background_menu,'Label','Green','Callback',{@change_slice_labels_background,4});
         h_slice_label_background_color(5) = uimenu(h_slice_labels_background_menu,'Label','Cyan','Callback',{@change_slice_labels_background,5});
@@ -901,7 +901,10 @@ function new_plot(~,~,~)
         if ~isempty(imdat) && nargin < 3
             load_q = questdlg('Load new image?','Load New');
             if strcmp(load_q,'Yes')
-                load_new_background
+                status = load_new_background;
+                if ~status % was cancelled
+                    return
+                end
             elseif strcmp(load_q,'No')
             else
                 return
@@ -1108,7 +1111,7 @@ end
 % Rotation:
 function rotate_slices(~, ~, rotate_degrees)
     if nargin < 3 || isempty(rotate_degrees)
-        prompt = {sprintf('Specify degrees to rotate clockwise (use negative for counter-clockwise):')};
+        prompt = {sprintf('Specify degrees to rotate clockwise (+) or counter-clockwise (-):')};
         dlg_title = 'Rotate'; num_lines = [1,35;]; 
         answer = inputdlg(prompt,dlg_title,num_lines);
         if isempty(answer); return; end
@@ -1119,14 +1122,12 @@ function rotate_slices(~, ~, rotate_degrees)
             C = get(handles.background_images(ix),'AlphaData');
             D = imrotate(C,rotate_degrees,'nearest','crop'); % 'nearest','bilinear','bicubic'
             set(handles.background_images(ix),'CData',B,'AlphaData',D);
-            set(handles.background_axes(ix),'XLim',[1,size(B,1)],'YLim',[1,size(B,2)]);
             if overlay_on && isgraphics(handles.overlay_axes(ix),'axes')
                 A = get(handles.overlay_images(ix),'CData');
                 B = imrotate(A,rotate_degrees,'nearest','crop'); %  'nearest','bilinear','bicubic'
                 C = get(handles.overlay_images(ix),'AlphaData');
                 D = imrotate(C,rotate_degrees,'nearest','crop'); % 'nearest','bilinear','bicubic'
                 set(handles.overlay_images(ix),'CData',B,'AlphaData',D);
-                set(handles.overlay_axes(ix),'XLim',[1,size(B,1)],'YLim',[1,size(B,2)]);
             end
         end
     else
@@ -1136,14 +1137,12 @@ function rotate_slices(~, ~, rotate_degrees)
                 C = get(handles.background_images(ix),'AlphaData');
                 D = imrotate(C,rotate_degrees,'nearest','crop'); % 'nearest','bilinear','bicubic'
                 set(handles.background_images(ix),'CData',B,'AlphaData',D);
-                set(handles.background_axes(ix),'XLim',[1,size(B,1)],'YLim',[1,size(B,2)]);
                 if overlay_on && isgraphics(handles.overlay_axes(ix),'axes')
                     A = get(handles.overlay_images(ix),'CData');
                     B = imrotate(A,rotate_degrees,'nearest','crop'); %  'nearest','bilinear','bicubic'
                     C = get(handles.overlay_images(ix),'AlphaData');
                     D = imrotate(C,rotate_degrees,'nearest','crop'); % 'nearest','bilinear','bicubic'
                     set(handles.overlay_images(ix),'CData',B,'AlphaData',D);
-                    set(handles.overlay_axes(ix),'XLim',[1,size(B,1)],'YLim',[1,size(B,2)]);
                 end
         end
     end
@@ -1776,13 +1775,13 @@ function resizeFigure
     end
 end
 
-function load_new_background
+function status = load_new_background
+    status = 0;
     [background, background_path] = uigetfile({'*.nii';'*.nii.gz';'*.img'},...
         'Select a 3D image:','MultiSelect','off');
     if background_path==0 % Cancel
-        disp('User cancelled action.'); 
-        handles = []; 
-        return; 
+        disp('Load new image cancelled.'); 
+        return
     end
     if ischar(background)
         try 
@@ -1806,6 +1805,7 @@ function load_new_background
             otherwise, physical_units = '';
         end
     end
+    status = 1;
 end
 
 function h = neuroimage_overobj(Type)

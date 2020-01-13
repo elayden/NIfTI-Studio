@@ -23,13 +23,13 @@ function [handles] = nifti_studio(varargin)
 %   (Note: these can also be loaded within the GUI)
 %   'background',       filename or path-filename to a background image to
 %                       be loaded; can also be loaded image structure 
-%   'overlay',         filename or path-filename to an image to be loaded
-%                       as overlay #1; can also be loaded image structure
+%   'overlay',          filename or path-filename to an image to be loaded
+%                       as an overlay; can also be loaded image structure
 %   'colorbar',         customization: true/false
 %   'title_on',         customization: true/false
 %   'axis_tick_on',     customization: true/false
 %   'colormap',         colormap for main figure (background), specified as
-%                       string, e.g. 'colormap','jet'
+%                       string, e.g., 'colormap','jet'
 %   'axes',             an axes graphics object (handle); used to embed a 
 %                       NIfTI Studio window within an already present
 %                       figure/axes
@@ -48,18 +48,17 @@ function [handles] = nifti_studio(varargin)
 % load_untouch_nii.m in NIFTI Tools)]
 %
 % General Features:
-% 'apply_header' = true/false (apply affine contained in header?)
-% -use up and down arrow keys to navigate slices (z-dimension)
+% -use up and down arrow keys to navigate slices
 % -use the mouse scroll wheel to zoom in or out
 % -right click and drag OR Ctrl + left click:  pans left/right, up/down
 % -click and drag the mouse: 
 %   in Crosshair mode: to obtain coordinates and pixel intensity value at
 %     the clicked location
-%   in Drawing mode:  to draw shapes; for instance, drawing an arc will 
+%   in Drawing mode:  draw shapes; for instance, drawing an arc will 
 %     cause the interior of the arc to become filled with color; any closed 
 %     figure will also be filled with color (particularly useful for erasing 
 %     undesirable parts of images like artifacts, or for creating ROIs)
-%     -can draw to edit underlying image data, to draw new ROIs which can
+%     -can draw to edit background image data, to draw new ROIs which can
 %     be saved as a separate file from the main image, or to edit loaded
 %     overlay images (such as a set of ROIs saved from an external program)
 % -specify draw color based on image's intensity units (default = 0, i.e. 
@@ -78,76 +77,56 @@ function [handles] = nifti_studio(varargin)
 %     location; (away from computer): zooming out at  different mouse 
 %     location will also adjust the zoom location
 % 's' hotkey saves whichever file is currently being edited
-
-% Menu's and Options:
-% "FILE" Menu:
-%   -"Open" (hotkey: 'o'): select new file to open; be careful to save first
-%   -"Save Image" (hotkey: 's'): save current image and any edits with the 
-%       same image filename as was loaded
-%   -"Save Image As": specify new file name to save image as
-%   -"Save Drawing": save current ROI drawing using predefined colors
-%   -"Save Drawing As": specify new filename with which to save ROI drawing
-%   -"Exit" (hotkey: 'esc'): Exits the program, first prompting user to
-%       verify the desire to exit
-% "EDIT" Menu:
-%   -"Undo" (hotkey: 'u'): undo last action (whether edit to underying
-%       data, drawing, or overlay); stores 2 actions back in RAM
-%   -"Redo" (hotkey: 'r'): redo undone action (up to 2 forward)
-%   -"Go to Slice..." (hotkey: 'g'): navigate to specified slice
-% "DISPLAY" Menu:
-%   -"Orientation": change orientation between coronal, sagittal, or axial
-%   -"Colormap": change colormap of the underyling data/background image
-%       -note: overlay colormaps can be changed in the Overlay menu, see
-%       below
-%   -"Autoscale Slice Color": if yes, autoscales color axis of each slice
-%       (this can slightly reduce performance when navigating quickly
-%       through slices)
-%       -if "No", can either use the max and min color/intensity of the
-%       whole 3D image to scale each slice, or can specify custom color
-%       axis limits
-%   -"Slice # (On/Off)": turn on/off title which displays slice #
-%   -"Colorbar (On/Off)": turn on/off colorbar
-%   -"Axis Tick (On/Off)": turn on/off axis ticks
-%       -note: if all of the above 3 are turned off, the image display is
-%       maximized in the figure window
-% "DRAW" Menu:
-%   -"Edit Underlying Data": this menu allows user to edit the background
-%       image's underlying data
-%       -"Select Draw Color": specify an image intensity to use for drawing 
-%           (default: 0)
-%       -"Crop Border": specify a # of voxels to crop from
-%           each edge of current slice
-%       -"Fill Slice": fills entire slice with current draw color intensity
-%   -"Edit Drawing": this menu allows user to create an ROI drawing
-%       overlayed on top of the background image
-%       -"Select Draw Color": select from a set of predefined colors (note
-%       	that the numbers in parentheses are the values which will be
-%       	written to image voxels if the drawing is saved); if "Disable" 
-%           is selected, then drawing control will return to the background
-%           image/underlying data
-%       -"Opacity": select the opacity/transparency of the
-%           drawing overlay; this can be chosen separately for any loaded
-%           overlays (see Overlay menu below)
-% "OVERLAY" Menu:
-%   -"Add/Edit Overlays": this creates a new GUI window specific to actions
-%       involving any external overlay images that are loaded
-%       -Options include, "Open", "Close", "Save", change colormap, change
-%           opacity, change color axis limits (color range), toggle
-%           colorbar, and "Edit"
-%       -Note: toggling "Colorbar" on will replace the background image
-%           colorbar with one that corresponds to the loaded overlay;
-%           "Colorbar (On/Off)" in the "Display" menu must be toggled on
-%           for this to have an effect
-%       -Note 2: if "Edit" is toggled on, user is prompted to enter an
-%           intensity value for drawing which corresponds to the overlay 
-%           image (and not the background image); if "Edit" is toggled off,
-%           drawing control will be returned to the previous mode (either
-%           background/underlying data editing or ROI drawing)
 % 
-% Dependencies: NIFTI_tools (Shen, 2005) must be on Matlab's path (download
-% link: http://www.mathworks.com/matlabcentral/fileexchange/8797-tools-for-nifti-and-analyze-image)
-% Note that the necessary functions have been included in the 
-% NIfTI Studio download folder, so no further action is required.
+% GUI Menus:
+% FILE
+%   -Open:  select new file to open as a background or overlay image
+%   -Close Overlay...:  close an open overlay image
+%   -Save:  save a background or overlay image along with any edits made 
+%           using the same filename as was loaded
+%   -Save As:  save a background or overlay image with a new file name
+%   -Exit (hotkey: 'esc'):  exits NIfTI Studio, prompting user to verify
+% SELECT
+%   -select either the background image or a loaded overlay to edit
+%   -New Overlay...:  create a new overlay image
+% TOOLS
+%   -Crosshair (hotkey: 'c'):  enables the crosshair tool, which outputs
+%   voxel location and value when the image is clicked
+%   -Draw (hotkey: 'd'):  enables the drawing tool, which allows edits to
+%   the selected image (e.g., create new spherical ROIs)
+%   -Pan (hotkey:  'p'):  enables the pan tool, which allows the user to
+%   click and drag to move the image (adjust axes limits). Note that the
+%   pan tool can also be accessed while drawing via ctrl + click or right
+%   click
+% EDIT
+%   -Undo (hotkey: 'u'):  undo last action (drawing or orientation change)
+%   -Redo (hotkey: 'r'):  redo actions following calls to undo
+%   -Go to Slice... (hotkey: 'g'):  navigate to a specified slice
+%   -Revert to Defaults:  change display settings back to defaults
+% DISPLAY
+%   -Orientation:   change orientation (Coronal, Sagittal, Axial, 
+%                   3D Display, Mosaic of slices)
+%   -Colorbar (On/Off):   turn on/off colorbar
+%   -Axis Tick (On/Off):  turn on/off axis ticks
+%   -Slice # (On/Off):    turn on/off title which displays slice #
+% DRAW
+%   -Select Draw Color: specify an image intensity to use for drawing 
+%   -Shapes:  select a shape to draw (No Shape (Manual Trace), Circle,
+%             Rectangle, Sphere)
+%   -Propagate through Slices:  propagate the most recent drawing through
+%                               specified slices
+%   -Add Border:  specify a # of voxels to create a border within the 
+%                 current slice
+%   -Fill Slice:  fill an entire slice with current draw color
+% COLORS
+%   -Colormap:      change colormap of the selected image
+%   -Color Scale: 	change the color scale (climit) for the selected image
+% 
+% Dependencies: 
+% NIFTI_tools (Shen, 2005) must be on Matlab's path
+%   Link: http://www.mathworks.com/matlabcentral/fileexchange/8797-tools-for-nifti-and-analyze-image
+%   Note that the necessary functions have been included in the 
+%   NIfTI Studio download folder, so no further action is required.
 
 % Note: colorbars and overlays will not function properly for Matlab
 % versions prior to 2014b, due to the major graphics update which came in
@@ -155,6 +134,7 @@ function [handles] = nifti_studio(varargin)
 
 % Author:  Elliot Layden, University of Chicago, 2016-2019
 % Contact:  elliot.layden@gmail.com
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Load Image and Initialize to Display a Middle Slice:
 figure_color = [.2,.2,.2];
@@ -314,7 +294,7 @@ customizable = {'colorbar_on','title_on','axis_tick_on',...
 first_dir = pwd; last_nav_dir = pwd; 
 extensions = {'*.img';'*.nii';'*.nii.gz'};
 slice_orientation = 3; % default = z-dim
-h_title = 10.48487; num_voxels_crop = 0; 
+h_title = 10.48487; num_voxels_border = 0; 
 scroll_zoom_equiv = [1,.9,.8,.7,.6,.5,.4,.3,.2,.1];
 
 % Set user interface callback functions:
@@ -477,8 +457,8 @@ if isempty(parsed_inputs.axes)
     h_shapes(2) = uimenu(h_shapes_menu,'Label','Circle','Callback',{@draw_shapes_callback,1});
     h_shapes(3) = uimenu(h_shapes_menu,'Label','Rectangle','Callback',{@draw_shapes_callback,2});
     h_shapes(4) = uimenu(h_shapes_menu,'Label','Sphere','Callback',{@draw_shapes_callback,3});
-    uimenu(draw_menu,'Label','Propagate Through Slices','Callback',@propagate_draw_callback);    
-    uimenu(draw_menu,'Label','Crop Border','Callback',@crop_border_callback);
+    uimenu(draw_menu,'Label','Propagate through Slices','Callback',@propagate_draw_callback);    
+    uimenu(draw_menu,'Label','Add Border','Callback',@add_border_callback);
     uimenu(draw_menu,'Label','Fill Slice','Callback',@apply2whole_slice_callback);
     
     % COLOR
@@ -943,12 +923,18 @@ function write_settings
 end
 
 function revert_defaults(~,~,~)
+    % Default display options
     colorbar_on = 1;                                                                                             
     title_on = 1;                                                                                             
-    axis_tick_on = 1;                                                                                         
+    axis_tick_on = 1;       
+    set(menu_colorbar,'Checked','on')
+    set(menu_axis_tick,'Checked','on')
+    set(menu_slice_number,'Checked','on')
+
     extensions = {'*.img';'*.nii';'*.nii.gz'};                                                                 
     last_nav_dir = first_dir;
     
+    % Change colormaps to defaults
     save_selected = selectedImage;
     selectedImage = 1;
     colorMapStr{1} = 'gray'; 
@@ -961,6 +947,7 @@ function revert_defaults(~,~,~)
         end
     end
     selectedImage = save_selected;
+    
     refresh_img = true;
     updateImage
 end
@@ -1831,21 +1818,21 @@ function go_to_slice_callback(~,~,~)
     updateImage
 end
 
-% Crop Border Button Callback:
-function crop_border_callback(~,~,~)
-    prompt = {'# voxels from border: '};
-    dlg_title = 'Crop'; num_lines = [1,25];
+% Add Border Button Callback:
+function add_border_callback(~,~,~)
+    prompt = {'# voxels: '};
+    dlg_title = 'Border'; num_lines = [1,25];
     defaultans = {'0'};
     answer1 = inputdlg(prompt,dlg_title,num_lines,defaultans,'on');
     if ~isempty(answer1)
-        num_voxels_crop = str2double(answer1);
-        if num_voxels_crop ~= 0
-            % Get border crop indices
+        num_voxels_border = str2double(answer1);
+        if num_voxels_border ~= 0
+            % Get border indices
             slice_data = false(size(imageData{selectedImage}(xind,yind,curr_slice)));
-            slice_data(1:num_voxels_crop,:) = true;
-            slice_data(end-num_voxels_crop:end,:) = true;
-            slice_data(:,1:num_voxels_crop) = true;
-            slice_data(:,end-num_voxels_crop:end) = true;
+            slice_data(1:num_voxels_border,:) = true;
+            slice_data(end-num_voxels_border:end,:) = true;
+            slice_data(:,1:num_voxels_border) = true;
+            slice_data(:,end-num_voxels_border:end) = true;
             [x, y] = ind2sub(size(slice_data), find(slice_data(:)));
             idx_border = sub2ind(size(imageData{selectedImage}), x, y, repmat(curr_slice, [numel(x), 1]));
             
@@ -1859,7 +1846,7 @@ function crop_border_callback(~,~,~)
                     alphaData{selectedImage}(idx_border))
             end
             
-            % Crop border
+            % Add border
             imageData{selectedImage}(idx_border) = draw_color;
             curr_drawing = imageData{selectedImage}(:,:,curr_slice);
             if selectedImage > 1

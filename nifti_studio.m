@@ -660,7 +660,6 @@ function load_img(img_type)
     [xdim, ydim, zdim] = size(imageData{1});
     middle_slice = round(zdim/2); 
     curr_slice = middle_slice;
-    draw_on = false; 
     xind = xdim:-1:1; 
     yind = 1:ydim;
     slice_orientation = 3; % default: Z-dim
@@ -678,13 +677,13 @@ function load_img(img_type)
     end
 
     % Reset
-    shape = 0;
     scroll_count = 0;
     
     % Reset undo's:
     undoNum = 0; 
     undoCache = struct('selectedImage', [], 'action', [], ...
         'orientation', [], 'idx', [], 'color', [], 'alpha', []);
+    redoCache = [];
     
     % Determine possible combinations of x,y indices:
     poss_ind = zeros(xdim*ydim,2); count = 0;
@@ -1017,6 +1016,13 @@ function status = openNewBackground(~,~,~)
         'orientation', [], 'idx', [], 'color', [], 'alpha', []);
     redoCache = struct('selectedImage', [], 'action', [], ...
         'orientation', [], 'idx', [], 'color', [], 'alpha', []);
+    
+    % Assure orientation menu reverts to axial:
+    for i = 1:length(menu_orientations)
+        set(menu_orientations(i), 'Checked','off'); 
+    end
+    set(menu_orientations(3),'Checked','on');
+
 end
 
 % "Save" Button Callback:
@@ -1665,6 +1671,13 @@ end
 %% Undo / Redo
 
 function cacheState(selectedImage, action, orientation, idx, color, alpha)
+
+    % In case currently iterating undoCallback, new action resets forward
+    % memory:
+    redoCache = [];
+    if numel(undoCache) > undoNum
+        undoCache(undoNum + 1 : end) = [];
+    end
     
     % Cache previous state
     if undoNum == 0
@@ -1765,7 +1778,8 @@ function purgeUndoRedo(closeWhich)
     
     i = 1;
     while i <= length(undoCache)
-       if undoCache(i).selectedImage == closeWhich && ~strcmp(undoCache(i).action, 'reorient')
+       if undoCache(i).selectedImage == closeWhich && ...
+               ~strcmp(undoCache(i).action, 'reorient') % don't purge 'reorient' actions
           undoCache(i) = []; 
           undoNum = undoNum - 1;
        else 
@@ -1776,7 +1790,7 @@ function purgeUndoRedo(closeWhich)
     i = 1;
     while i <= length(redoCache)
         if (~isempty(redoCache(i).selectedImage) && redoCache(i).selectedImage == closeWhich) || ...
-            (~isempty(redoCache(i).action) && ~strcmp(redoCache(i).action,'reorient'))
+            (~isempty(redoCache(i).action) && ~strcmp(redoCache(i).action,'reorient')) % don't purge 'reorient' actions
             redoCache(i) = []; 
         else 
             i = i + 1;

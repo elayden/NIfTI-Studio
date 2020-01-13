@@ -519,6 +519,8 @@ if isempty(parsed_inputs.axes)
 %     end
 end
 
+crosshair_callback
+
 %% Customizations
 
 % Must run to initialize axes etc., prior to the subsequent lines
@@ -1015,8 +1017,6 @@ function status = openNewBackground(~,~,~)
         'orientation', [], 'idx', [], 'color', [], 'alpha', []);
     redoCache = struct('selectedImage', [], 'action', [], ...
         'orientation', [], 'idx', [], 'color', [], 'alpha', []);
-           
-    crosshair_callback
 end
 
 % "Save" Button Callback:
@@ -1690,28 +1690,20 @@ end
 function undoCallback(~, ~, ~)
 
     if undoNum==0; return; end
-    
-    % Check if overlay has been deleted
-    if length(imageData) < undoCache(undoNum).selectedImage || isempty(imageData{undoCache(undoNum).selectedImage})
-        undoCache(undoNum).selectedImage = 1;
-        undoCache(undoNum).action = NaN;
-        undoNum = undoNum - 1;
-        return
-    end
-        
+  
     % Update or initialize redoCache
     if undoNum == length(undoCache) % first undo
         if undoCache(undoNum).selectedImage==1
             redoCache = struct('selectedImage', undoCache(undoNum).selectedImage, ...
                 'action', undoCache(undoNum).action, ...
-                'orientation', undoCache(undoNum).orientation, ...
+                'orientation', slice_orientation, ...
                 'idx', undoCache(undoNum).idx, ...
                 'color', imageData{undoCache(undoNum).selectedImage}(undoCache(undoNum).idx), ...
                 'alpha', []);
         else
             redoCache = struct('selectedImage', undoCache(undoNum).selectedImage, ...
                 'action', undoCache(undoNum).action, ...
-                'orientation', undoCache(undoNum).orientation, ...
+                'orientation', slice_orientation, ...
                 'idx', undoCache(undoNum).idx, ...
                 'color', imageData{undoCache(undoNum).selectedImage}(undoCache(undoNum).idx), ...
                 'alpha', alphaData{undoCache(undoNum).selectedImage}(undoCache(undoNum).idx));
@@ -1720,14 +1712,14 @@ function undoCallback(~, ~, ~)
         if undoCache(undoNum).selectedImage==1
             redoCache(end+1) = struct('selectedImage', undoCache(undoNum).selectedImage, ...
                 'action', undoCache(undoNum).action, ...
-                'orientation', undoCache(undoNum).orientation, ...
+                'orientation', slice_orientation, ...
                 'idx', undoCache(undoNum).idx, ...
                 'color', imageData{undoCache(undoNum).selectedImage}(undoCache(undoNum).idx), ...
                 'alpha', []);
         else
             redoCache(end+1) = struct('selectedImage',undoCache(undoNum).selectedImage, ...
                 'action', undoCache(undoNum).action, ...
-                'orientation', undoCache(undoNum).orientation, ...
+                'orientation', slice_orientation, ...
                 'idx', undoCache(undoNum).idx, ...
                 'color', imageData{undoCache(undoNum).selectedImage}(undoCache(undoNum).idx), ...
                 'alpha', alphaData{undoCache(undoNum).selectedImage}(undoCache(undoNum).idx));
@@ -1743,7 +1735,7 @@ function undoCallback(~, ~, ~)
     elseif strcmp(undoCache(undoNum).action, 'reorient')
         reorient_callback(menu_orientations(undoCache(undoNum).orientation), [], 1)
     end
-    
+
     undoNum = undoNum - 1;
     updateImage
 end
@@ -1753,16 +1745,6 @@ function redoCallback(~,~,~)
     
     if numel(redoCache) == 0; return; end
     
-    % Check if overlay has been deleted
-    if undoNum~=0 && ~isempty(redoCache) && length(redoCache) >= undoNum
-        if length(imageData) < redoCache(undoNum).selectedImage ...
-            || (length(imageData) >= redoCache(undoNum).selectedImage ...
-            && isempty(imageData{redoCache(undoNum).selectedImage}))
-            undoNum = min(undoNum + 1, length(undoCache));
-            return
-        end
-    end
-    
     % Move forward to most recent redo
     if strcmp(redoCache(end).action, 'draw')
         imageData{redoCache(end).selectedImage}(redoCache(end).idx) = redoCache(end).color;
@@ -1770,12 +1752,38 @@ function redoCallback(~,~,~)
             alphaData{redoCache(end).selectedImage}(redoCache(end).idx) = redoCache(end).alpha;
         end
     elseif strcmp(redoCache(end).action, 'reorient')
-        reorient_callback(menu_orientations(undoCache(undoNum).orientation), [], 1)
+        reorient_callback(menu_orientations(redoCache(end).orientation), [], 1)
     end
     
     redoCache(end) = [];
     undoNum = min(undoNum + 1, length(undoCache));
     updateImage
+end
+
+% Clear any overlay edits from undo/redo cache
+function purgeUndoRedo(closeWhich)
+    
+    i = 1;
+    while i <= length(undoCache)
+       if undoCache(i).selectedImage == closeWhich && ~strcmp(undoCache(i).action, 'reorient')
+          undoCache(i) = []; 
+          undoNum = undoNum - 1;
+       else 
+           i = i + 1;
+       end
+    end
+    
+    i = 1;
+    while i <= length(redoCache)
+        if (~isempty(redoCache(i).selectedImage) && redoCache(i).selectedImage == closeWhich) || ...
+            (~isempty(redoCache(i).action) && ~strcmp(redoCache(i).action,'reorient'))
+            redoCache(i) = []; 
+        else 
+            i = i + 1;
+        end
+    end
+    
+    undoNum = min(max(undoNum, 0), length(undoCache));
 end
 
 %% Other Editing
@@ -2244,6 +2252,10 @@ function closeOverlay(~, ~, closeWhich)
     end
     
     if closeWhich > 1
+        
+        % Clear any overlay edits from undo/redo cache
+        purgeUndoRedo(closeWhich)
+        
         if length(handles.images) >= closeWhich && ~isempty(handles.images{closeWhich}) && ishandle(handles.images{closeWhich})
             delete(handles.images{closeWhich})
             handles.images{closeWhich} = [];

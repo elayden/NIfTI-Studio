@@ -1858,6 +1858,7 @@ function goToOrigin(~,~,~)
     updateImage;
     
     % Create datatip
+    % https://undocumentedmatlab.com/articles/controlling-plot-data-tips
     dcm_obj = crosshair_callback;  % switch to crosshair tool
     hDatatip = dcm_obj.createDatatip(handles.images{1});
     set(hDatatip,'UIContextMenu',get(dcm_obj,'UIContextMenu'));

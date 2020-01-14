@@ -220,6 +220,7 @@ fullPaths = {[]}; % stores full paths of background and overlay images
 
 origin = [];
 physical_units = [];
+units = 'physical';
 filename = []; fpath = []; aspect_ratio = []; fig_width = []; dimperm = [];
 draw_on = false; pan_on = false;
 window_name = []; dim = []; pixdim = []; voxSize = []; xwidth = []; yheight = [];
@@ -251,14 +252,14 @@ menu_orientations = zeros(1,length(orientation_labels));
 menu_slice_number = []; menu_colorbar = []; menu_axis_tick = [];
 
 % Axes Positions:
-ax_pos_all_on =        [.075,  .04,  .8,  .92]; % All On
+ax_pos_all_on =        [.09,  .04,  .8,  .92]; % All On
 ax_pos_all_off =       [0,     0,    1,    1]; % All Off
-ax_pos_no_title =      [.075,  .04,  .8,  .95]; % No Title
-ax_pos_no_colorbar =   [.08,  .04,  .88,  .92]; % No Colorbar
+ax_pos_no_title =      [.09,  .04,  .8,  .95]; % No Title
+ax_pos_no_colorbar =   [.09,  .04,  .88,  .92]; % No Colorbar
 ax_pos_no_tick =       [0,     0,    .88,  .95]; % No Tick
 ax_pos_title_only =    [0,     0,    1,    .95]; % Title only
 ax_pos_colorbar_only = [0,     0,    .88,  1];% Colorbar only
-ax_pos_tick_only =     [.08,  .04, .88, .95]; % Tick Only
+ax_pos_tick_only =     [.09,  .04, .88, .95]; % Tick Only
 colorbar_pos = [.927, ax_pos_all_on(2), 0.0390, ax_pos_all_on(4)];
 curr_axis_pos = ax_pos_all_on; 
 x_ax_percent = curr_axis_pos(3);
@@ -352,12 +353,7 @@ if isempty(parsed_inputs.axes)
         
     % CLOSE
     close_overlays_menu = uimenu(file_menu,'Label','Close Overlay...');
-%     if overlay_present
-%         h_close(2) = uimenu(close_overlays_menu,'Label',...
-%             sprintf('Overlay %g',1),'Callback',{@closeOverlay,2}); % start at 2 to match h_image
-%     else
-        h_close = [];
-%     end
+    h_close = [];
     
     % SAVE  
     save_menu = uimenu(file_menu,'Label','Save');
@@ -373,13 +369,7 @@ if isempty(parsed_inputs.axes)
     % SELECT
     select_menu = uimenu(handles.figure,'Label','Select');
     h_image(1) = uimenu(select_menu,'Label','Background Image',...
-        'Callback',{@changeSelection,1});
-%     if overlay_present
-%         h_image(2) = uimenu(select_menu,'Label',sprintf('Overlay %g',1),...
-%             'Checked','on','Callback',{@changeSelection,2});
-%     else
-        set(h_image(1),'Checked','on')
-%     end
+        'Checked','on','Callback',{@changeSelection,1});
     h_new_image = uimenu(select_menu,'Label','New Overlay...',...
         'Callback',@createOverlay);
 
@@ -401,15 +391,14 @@ if isempty(parsed_inputs.axes)
     uimenu(edit_menu,'Label','Redo                          ''r''',...
         'Callback',@redoCallback);
     uimenu(edit_menu,'Label','Go to Slice...             ''g''',...
-        'Callback',@go_to_slice_callback);
-    uimenu(edit_menu,'Label','Revert to Defaults','Callback',@revert_defaults);
-    
-    % DISPLAY
-    display_opts_menu = uimenu(handles.figure,'Label','Display');
-else
-    display_opts_menu = uimenu(handles.figure,'Label','Display');
+        'Callback',@goToSlice);
+    uimenu(edit_menu,'Label','Go to Origin...           ''o''',...
+        'Callback',@goToOrigin);
+    uimenu(edit_menu,'Label','Revert to Defaults','Callback',@revert_defaults);    
 end
 
+% DISPLAY
+display_opts_menu = uimenu(handles.figure,'Label','Display');
 orient_menu = uimenu(display_opts_menu,'Label','Orientation');
 for ixx = 1:length(orientation_labels)
     menu_orientations(ixx) = uimenu(orient_menu,'Label',...
@@ -417,6 +406,13 @@ for ixx = 1:length(orientation_labels)
         'Callback',@reorient_callback); 
 end
 set(menu_orientations(3),'Checked','on');
+
+% Units:
+menu_units = uimenu(display_opts_menu,'Label','Units'); 
+h_units(1) = uimenu(menu_units,'Label','Physical','Checked','on',...
+    'Callback', @changeUnits); 
+h_units(2) = uimenu(menu_units,'Label','Voxel','Checked','off',...
+    'Callback', @changeUnits); 
 
 if isempty(parsed_inputs.axes)
     if colorbar_on
@@ -608,7 +604,7 @@ function load_img(img_type)
     end
     
     % Determine voxel units & origin:
-    d=0
+    d=0;
     try
         origin = img.hdr.hist.originator(1:3);
         switch bitand(img.hdr.dime.xyzt_units, 7) % see xform_nii.m, extra_nii_hdr.m
@@ -1375,6 +1371,20 @@ function reorient_callback(hObject, ~, ~)
     resizeFigure;
 end
 
+function changeUnits(~,~,~)
+    if strcmp(units, 'physical')
+        units = 'voxel';
+        set(h_units(1), 'Checked','off'); set(h_units(2), 'Checked','on')
+    else
+        units = 'physical';
+        set(h_units(1), 'Checked','on'); set(h_units(2), 'Checked','off')
+    end
+    % Update Image:
+    refresh_img = false; 
+    updateImage
+    repositionAxes
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Edit Underlying Data (Background Figure) Colorspec, Colormap, Colorbar, Auto-Scale:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1587,7 +1597,7 @@ function disableInteractiveModeHijack(whichTool)
 end
 
 % Tools menu callbacks:
-function crosshair_callback(~,~,~)
+function dcm_obj = crosshair_callback(~,~,~)
 %     zoom off
     dcm_obj = datacursormode(handles.figure);
     set(dcm_obj, 'Enable', 'on', 'UpdateFcn', @dataCursorCallback)
@@ -1606,17 +1616,11 @@ end
 function output_txt = dataCursorCallback(~, event_obj)
     % event_obj    Object containing event data structure
     % output_txt   Data cursor text
-
+    
     % Get position
     pt = get(event_obj, 'Position');
     
     % Format text:
-%     output_txt = ['Background: [',...
-%         num2str(yind(pt(1))), ', ',...
-%         num2str(xind(pt(2))), ', ',...
-%         num2str(curr_slice),', ',...
-%         num2str(imageData{1}(xind(pt(2)),yind(pt(1)),curr_slice)), ']'];
-
     output_txt = ['[',...
         num2str(round((yind(pt(1))-origin(2)) * voxSize(2),2)), ', ',...
         num2str(round((xind(pt(2))-origin(1)) * voxSize(1),2)), ', ',...
@@ -1631,11 +1635,6 @@ function output_txt = dataCursorCallback(~, event_obj)
     if numel(imageData) > 1
         for i = 2:length(imageData)
             if ~isempty(imageData{i})
-%                 output_txt = [output_txt, '\nOverlay ',num2str(i-1),': [',...
-%                     num2str(yind(pt(1))), ', ',...
-%                     num2str(xind(pt(2))), ', ',...
-%                     num2str(curr_slice),', ',...
-%                     num2str(imageData{i}(xind(pt(2)),yind(pt(1)),curr_slice)), ']']; %#ok
                 output_txt = [output_txt, '\nOverlay ',num2str(i-1),':  ',...
                         num2str(round(imageData{i}(xind(pt(2)),yind(pt(1)),curr_slice),2))]; %#ok
             end
@@ -1836,7 +1835,7 @@ end
 %% Other Editing
 
 % Go to Slice Callback:
-function go_to_slice_callback(~,~,~)
+function goToSlice(~,~,~)
     prompt = {'Specify slice: '};
     dlg_title = 'Go to Slice'; num_lines = [1,15;]; defaultans = {num2str(zdim)};
     answer1 = inputdlg(prompt,dlg_title,num_lines,defaultans);
@@ -1850,6 +1849,20 @@ function go_to_slice_callback(~,~,~)
         return;
     end
     updateImage
+end
+
+function goToOrigin(~,~,~)
+    d=0;
+    % Go to origin slice
+    curr_slice = round(origin(3));
+    updateImage;
+    
+    % Create datatip
+    dcm_obj = crosshair_callback;  % switch to crosshair tool
+    hDatatip = dcm_obj.createDatatip(handles.images{1});
+    set(hDatatip,'UIContextMenu',get(dcm_obj,'UIContextMenu'));
+    set(hDatatip,'Position',[yind(round(origin(2))), xind(round(origin(1)))])
+    
 end
 
 % Add Border Button Callback:
@@ -2018,7 +2031,9 @@ function keypress_callback(varargin)
         case 'r'
             redoCallback
         case 'g'
-            go_to_slice_callback
+            goToSlice
+        case 'o'
+            goToOrigin
         case 'c'
             crosshair_callback
         case 'd'
@@ -2640,11 +2655,21 @@ function repositionAxes(~)
         resize1 = false;
     end
     % Apply Positioning:
+    if strcmp(units,'physical')
+        xticklabels = (yind(yticks)-origin(2)) .* voxSize(2);
+        yticklabels = (xind(xticks)-origin(1)) .* voxSize(1);
+        xticklabels = round(xticklabels,3,'significant');
+        yticklabels = round(yticklabels,3,'significant');
+        d=0;
+    elseif strcmp(units,'voxel')
+       xticklabels = yind(yticks);
+       yticklabels = xind(xticks);
+    end
     for i = 1:length(handles.axes)
         if ishandle(handles.axes{i})
             set(handles.axes{i},'XLim',ax_xlim,'YLim',ax_ylim, ...
                 'XTick',yticks,'YTick',xticks, 'Position', curr_axis_pos, ...
-                'XTickLabels', yind(yticks), 'YTickLabels', xind(xticks))
+                'XTickLabels', xticklabels, 'YTickLabels', yticklabels)
         end
     end
     if colorbar_on && ishandle(h_colorbar)

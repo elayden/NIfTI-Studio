@@ -56,8 +56,8 @@ function [handles] = nifti_studio_mosaic(varargin)
 %                   apply to all slices in degrees (default: 0) 
 % 'slice_labels',   [numeric: 1/0 or logical: true/false, denoting whether
 %                   or not to add slice labels
-% 'slice_label_phys',[numeric: 1 or 2]; (1) = use slice #'s, (2) = use
-%                     physical distance from origin
+% 'slice_label_phys', 1/0; (0) = use slice #'s, (1) = use physical distance 
+%                     from origin
 % 'slice_label_pos', [numeric: 1-6]; (1) = Top Left, (2) = Top Middle, 
 %                    (3) = Top Right, (4) = Bottom left, (5) = Bottom
 %                    Middle, (6) = Bottom Right
@@ -126,7 +126,6 @@ if ~isempty(background)
         case 'char'
             try 
                 back_img = load_nii(background); 
-%                 disp('Successfully loaded background image.')
             catch
                 try
                     back_img = load_untouch_nii(background);
@@ -137,41 +136,55 @@ if ~isempty(background)
             end
             imdat = back_img.img; 
             pixdim = back_img.hdr.dime.pixdim([2,3,4]);
-            % Determine Units:
-            unit_code = back_img.hdr.dime.xyzt_units(1);
-            switch unit_code
-                case 0, physical_units = '';
-                case 1, physical_units = '(m)';
-                case 2, physical_units = '(mm)';
-                case 3, physical_units = '(microns)';
-                otherwise, physical_units = '';
-            end
+            % Get origin and units
+            origin = getOrigin(back_img);
+            physical_units = getUnits(back_img);
         case 'struct'
             try
                 imdat = background.img;
             catch
                 error('If input ''background'' is structure, should contain field ''.img''.')
             end
-            unit_code = background.hdr.dime.xyzt_units(1);
-            switch unit_code
-                case 0, physical_units = '';
-                case 1, physical_units = '(m)';
-                case 2, physical_units = '(mm)';
-                case 3, physical_units = '(microns)';
-                otherwise, physical_units = '';
-            end
             pixdim = background.hdr.dime.pixdim([2,3,4]);
+            origin = getOrigin(background);
+            physical_units = getUnits(background);
         otherwise
             if isnumeric(background)
                 imdat = background;
             else
                 error('Input ''background'' not recognized.')
             end 
-            physical_units = 'unknown';
+            physical_units = '';
             pixdim = ones(1,3);
     end
 else
     load_new_background
+end
+
+function physical_units = getUnits(img)
+    try
+        switch bitand(img.hdr.dime.xyzt_units, 7) % see xform_nii.m, extra_nii_hdr.m
+            case 1, physical_units = 'm';
+            case 2, physical_units = 'mm';
+            case 3, physical_units = 'microns';
+            otherwise, physical_units = '';
+        end
+    catch
+        physical_units = '';
+        warning('Failed to retrieve voxel units.')
+    end
+end
+
+function origin = getOrigin(img)
+    try
+        origin = img.hdr.hist.originator(1:3);
+    catch
+        origin = img.hdr.dime.dim(2:4)/2;
+        warning('Failed to retrieve origin.')
+    end
+    if any(origin==0)
+       origin = img.hdr.dime.dim(2:4)/2;
+    end
 end
 
 % Load Overlays:
@@ -187,16 +200,17 @@ end
 imdat = permute(imdat,[2,1,3]);
 overlay_dat = permute(overlay_dat,[2,1,3]);
 pixdim = pixdim([2,1,3]);
+origin = origin([2,1,3]);
 background_dim = size(imdat);
 
 % Get slice dimensions
 dimension = parsed_inputs.dimension; % default 3; never empty
-slice_dim = zeros(1,3); slice_pixdim = zeros(1,3);
+slice_dim = zeros(1,3); slice_pixdim = zeros(1,3); slice_origin = zeros(1,3);
 xmax = 0; ymax = 0;
 getSliceDimensions(dimension)
 
 set(0,'units','pixels'); 
-screen_res = get(0,'ScreenSize'); % initialize for later resizeFigure
+% screen_res = get(0,'ScreenSize'); % initialize for later resizeFigure
 
 function getSliceDimensions(dim)
     slice_dim = [0,0];
@@ -204,12 +218,15 @@ function getSliceDimensions(dim)
         case 1
             slice_dim = [background_dim(2), background_dim(3), background_dim(1)];
             slice_pixdim = [pixdim(2), pixdim(3), pixdim(1)];
+            slice_origin = [origin(2), origin(3), origin(1)];
         case 2
             slice_dim = [background_dim(1), background_dim(3), background_dim(2)];
             slice_pixdim = [pixdim(1), pixdim(3), pixdim(2)];
+            slice_origin = [origin(1), origin(3), origin(2)];
         case 3
             slice_dim = [background_dim(2), background_dim(1), background_dim(3)];
             slice_pixdim = [pixdim(2), pixdim(1), pixdim(3)];
+            slice_origin = [origin(2), origin(1), origin(3)];
     end
     xmax = slice_dim(1); ymax = slice_dim(2);
 end
@@ -233,13 +250,13 @@ function findSlices
     end
     % Find slices if not specified
     if isempty(slices)
-        slices = unique(round(linspace(.2 * background_dim(dimension), ...
-            .8 * background_dim(dimension), numslices)));
+        slices = unique(round(linspace(.2 * slice_dim(dimension), ...
+            .8 * slice_dim(dimension), numslices)));
     end
     % Check slices
-    if any(slices > background_dim(dimension)) || any(slices < 1)
+    if any(slices > slice_dim(dimension)) || any(slices < 1)
         error(['Slice numbers specified are out of bounds. Slices must be between 1 and ',...
-            num2str(background_dim(dimension)),' for dimension ',num2str(dimension),'.'])
+            num2str(slice_dim(dimension)),' for dimension ',num2str(dimension),'.'])
     end
 end
 
@@ -443,10 +460,10 @@ display_menu = uimenu(handles.figure,'Label','Display');
             h_units(2) = uimenu(measurements_menu,'Label','Physical Units','Checked','off','Callback',{@change_units,2});  
     slice_labels_menu = uimenu(display_menu,'Label','Slice Labels');
         slice_labels_type_menu = uimenu(slice_labels_menu,'Label','Type');
-        if slice_labels_on && slice_label_phys==1
+        if slice_labels_on && ~slice_label_phys
             h_slice_labels_menu(1) = uimenu(slice_labels_type_menu,'Label','Slice #','Checked','on','Callback',@change_slice_labels);
             h_slice_labels_menu(2) = uimenu(slice_labels_type_menu,'Label','Distance from Origin','Checked','off','Callback',@change_slice_labels);
-        elseif slice_labels_on && slice_label_phys==2
+        elseif slice_labels_on && slice_label_phys
             h_slice_labels_menu(1) = uimenu(slice_labels_type_menu,'Label','Slice #','Checked','off','Callback',@change_slice_labels);
             h_slice_labels_menu(2) = uimenu(slice_labels_type_menu,'Label','Distance from Origin','Checked','on','Callback',@change_slice_labels);
         elseif ~slice_labels_on
@@ -657,7 +674,8 @@ function plot_mosaic(initial)
     % Create Axes and Plot Mosaic:
     for ix = 1:numslices
         handles.background_axes(ix) = axes('parent',handles.figure,...
-            'position',ax_pos(ix,:),'NextPlot','add','units','normalized');
+            'position',ax_pos(ix,:),'NextPlot','add','units','normalized',...
+            'color',background_color);
         colormap(handles.background_axes(ix),background_cmap);
         if ~parsed_inputs.show_axes
             set(handles.background_axes(ix),'Visible','off');
@@ -737,6 +755,11 @@ function plot_mosaic(initial)
                 'FaceLighting','gouraud','AlphaData',.3,'AlphaDataMapping',...
                 'direct','FaceAlpha',.3,'EdgeAlpha',0,'FaceColor','Interp');
         end
+    end
+    
+    % Update slice labels
+    if ~initial 
+        change_slice_labels([],[],[])   
     end
     
     % Resize figure based on ratio of x- and y- axes
@@ -1021,14 +1044,23 @@ function new_plot(~,~,~)
 end
 
 function run_new_plot(~,~,~)
+    for ix = 1:3
+        if get(h_dim(ix),'Value')
+            dimension = ix;
+            break; 
+        end
+    end
+    
+    % Get new slice dimensions
+    getSliceDimensions(dimension)
+    
     if isempty(slices_spec.String)
         findSlices
     else
         slices = str2double(strsplit(slices_spec.String,','));
     end
-    for ix = 1:3; if get(h_dim(ix),'Value'); break; end; end
-    dimension = ix;
-    
+    numslices = length(slices);
+        
     if ~isempty(num_rows_spec.String)
         axes_dim(1) = str2double(num_rows_spec.String);
     else
@@ -1090,11 +1122,7 @@ function run_new_plot(~,~,~)
     if isgraphics(handles.slice_locator,'axes')
         delete(handles.slice_locator)
     end
-    
-    % Get new slice dimensions
-    getSliceDimensions(dimension)
-    numslices = length(slices);
-    
+
     % Re-initialize slice data containers
     background_slice_data = zeros(slice_dim(1),slice_dim(2),numslices);
     if overlay_on
@@ -1245,7 +1273,7 @@ function change_background(~, ~, which_color)
     h_background(which_color).Checked = 'on';
     if which_color<10
         handles.figure.Color = background_colors(which_color,:);
-        for ix = 1:numslices
+        for ix = 1:length(handles.background_axes)
             set(handles.background_axes(ix),'Color',background_colors(which_color,:));
         end
     else
@@ -1369,8 +1397,8 @@ function change_axis_color(~,~,which_color)
     h_ax_color(which_color).Checked = 'on';
     switch which_color
         case 1 % grey
-            grid_color = [.15,.15,.15];
-            axes_color = [.2,.2,.2];
+            grid_color = [.3,.3,.3];
+            axes_color = [.4,.4,.4];
         case 2 % black
             grid_color = zeros(1,3);
             axes_color = zeros(1,3);
@@ -1396,29 +1424,20 @@ function change_units(~,~,unit_type)
             case 1 % Voxel
                 h_units(1).Checked = 'on';
                 h_units(2).Checked = 'off';
-                for ix = 1:numslices
+                for ix = 1:length(handles.background_axes)
                     set(handles.background_axes(ix),...
                         'XTickLabelMode','auto','XTickMode','auto',...
-                        'YTickLabelMode','auto','YTickMode','auto',...
-                        'ZTickLabelMode','auto','ZTickMode','auto');
-%                     xlabel(handles.background_axes(ix),'X'); 
-%                     ylabel(handles.background_axes(ix),'Y'); 
-%                     zlabel(handles.background_axes(ix),'Z');
+                        'YTickLabelMode','auto','YTickMode','auto');
                 end
             case 2 % Physical
                 h_units(1).Checked = 'off';
                 h_units(2).Checked = 'on';
-                xtick = round(get(handles.background_axes(1),'XTick')'.*pixdim(1));
-                ytick = round(get(handles.background_axes(1),'YTick')'.*pixdim(2));
-                ztick = round(get(handles.background_axes(1),'ZTick')'.*pixdim(3));
-                for ix = 1:numslices
-                    set(handles.background_axes(ix),'XTickLabel',num2cell(xtick),...
-                        'XTickMode','manual','YTickLabel',num2cell(ytick),...
-                        'YTickMode','manual','ZTickLabel',num2cell(ztick),...
-                        'ZTickMode','manual');
-%                     xlabel(handles.background_axes(ix),['X ',physical_units]); 
-%                     ylabel(handles.background_axes(ix),['Y ',physical_units]); 
-%                     zlabel(handles.background_axes(ix),['Z ',physical_units]);
+                xtick = round((get(handles.background_axes(1),'XTick')' - slice_origin(2)).*slice_pixdim(2),3,'significant');
+                ytick =  round((get(handles.background_axes(1),'YTick')' - slice_origin(1)).*slice_pixdim(1),3,'significant');
+                for ix = 1:length(handles.background_axes)
+                    set(handles.background_axes(ix),...
+                        'XTickLabel',xtick,...
+                        'YTickLabel',ytick);
                 end
         end
     end
@@ -1429,35 +1448,16 @@ function change_slice_labels(hObject,~,change_pos,initial_call)
         which_callback = get(hObject,'Label');
         switch which_callback
             case 'Slice #'
-                if strcmp(h_slice_labels_menu(1).Checked,'on')
-                    set(h_slice_labels_menu(1),'Checked','off')
-                    if strcmp(h_slice_labels_menu(2).Checked,'off')
-                        slice_labels_on = 0;
-                    end
-                else
+                if strcmp(h_slice_labels_menu(1).Checked,'off')
                     set(h_slice_labels_menu(1),'Checked','on')
                     set(h_slice_labels_menu(2),'Checked','off')
-                    slice_labels_on = 1; slice_label_phys = 1;
+                    slice_labels_on = 1; slice_label_phys = 0;
                 end
             case 'Distance from Origin'
-                if strcmp(h_slice_labels_menu(2).Checked,'on')
-                    set(h_slice_labels_menu(2),'Checked','off')
-                    if strcmp(h_slice_labels_menu(1).Checked,'off')
-                        slice_labels_on = 0;
-                    end
-                else
+                if strcmp(h_slice_labels_menu(2).Checked,'off')
                     set(h_slice_labels_menu(1),'Checked','off')
                     set(h_slice_labels_menu(2),'Checked','on')
-                    slice_labels_on = 1; slice_label_phys = 2;
-                end
-                prompt = 'Specify slice # for origin:';
-                dlg_title = 'Origin'; num_lines = [1,30]; 
-                answer = inputdlg(prompt,dlg_title,num_lines);
-                if isempty(answer); return; end
-                parsed_inputs.origin_slice = str2double(answer{1});
-                for ix = 1:numslices
-%                     slice_distances(ix) = (slices(ix)-parsed_inputs.origin_slice)*pixdim(dimension);
-                    slice_distances(ix) = abs((slices(ix)-parsed_inputs.origin_slice)*pixdim(dimension)); % change this back if want negative distances
+                    slice_labels_on = 1; slice_label_phys = 1;
                 end
             otherwise
                 if nargin>2 && ~isempty(change_pos)
@@ -1506,19 +1506,18 @@ function change_slice_labels(hObject,~,change_pos,initial_call)
                                 .08*curr_ax_pos(3),...
                                 .03];
             end
-            switch slice_label_phys
-                case 1
-                    curr_str = num2str(slices(ix));
-                case 2 
-                    slice_distances(ix) = (slices(ix)-parsed_inputs.origin_slice)*pixdim(dimension); 
-                    curr_str = sprintf('%2.1f',round(slice_distances(ix),1));
+            if slice_label_phys
+                slice_distances(ix) = round((slices(ix)-slice_origin(3))*slice_pixdim(3),3,'significant');
+                curr_str = sprintf('%2.1f',round(slice_distances(ix),1));
+            else
+                curr_str = num2str(slices(ix));
             end
-            if nargin>3 && initial_call
+            if ~ishandle(handles.h_slice_labels(ix))% nargin>3 && initial_call
                 handles.h_slice_labels(ix) = annotation('textbox','Position',annot_pos,...
                     'String',curr_str,'FontName','Helvetica','FontSize',14,...
                     'EdgeColor','none','HorizontalAlignment','center',...
                     'VerticalAlignment','middle', 'color','w',...
-                    'FitBoxToText','on','Margin',0);
+                        'FitBoxToText','on','Margin',0);
             else
                 set(handles.h_slice_labels(ix),'Position',annot_pos,...
                     'String',curr_str,'FontSize',14,'HorizontalAlignment','center',...

@@ -1852,7 +1852,6 @@ function goToSlice(~,~,~)
 end
 
 function goToOrigin(~,~,~)
-    d=0;
     % Go to origin slice
     curr_slice = round(origin(3));
     updateImage;
@@ -1863,7 +1862,6 @@ function goToOrigin(~,~,~)
     hDatatip = dcm_obj.createDatatip(handles.images{1});
     set(hDatatip,'UIContextMenu',get(dcm_obj,'UIContextMenu'));
     set(hDatatip,'Position',[yind(round(origin(2))), xind(round(origin(1)))])
-    
 end
 
 % Add Border Button Callback:

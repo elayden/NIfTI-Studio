@@ -157,6 +157,8 @@ function [handles] = nifti_studio_3D(varargin)
 % 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+n_ticks = 10; % number of tick labels
+
 % Waitbar:
 h_wait = waitbar(0, 'Please wait...', 'Name', 'NIfTI Studio 3D');
 try
@@ -237,41 +239,17 @@ if ~isempty(background)
                 end
             end
             imdat = back_img.img; 
-            pixdim = back_img.hdr.dime.pixdim(2:4);
-            % Determine Units:
-            try
-                origin = back_img.hdr.originator;
-                switch bitand(back_img.hdr.dime.xyzt_units, 7) % see xform_nii.m, extra_nii_hdr.m
-                    case 1, physical_units = '(m)';
-                    case 2, physical_units = '(mm)';
-                    case 3, physical_units = '(microns)';
-                    otherwise, physical_units = '';
-                end
-            catch
-                physical_units = '';
-            end
         case 'struct'
             try
                 imdat = background.img;
+                back_img = background;
             catch
                 error('If input ''background'' is structure, should contain field ''.img''.')
             end
-            try
-                unit_code = background.hdr.dime.xyzt_units(1);
-                switch unit_code
-                    case 0, physical_units = '';
-                    case 1, physical_units = '(m)';
-                    case 2, physical_units = '(mm)';
-                    case 3, physical_units = '(microns)';
-                    otherwise, physical_units = '';
-                end
-            catch
-                physical_units = '';
-            end
-            pixdim = background.hdr.dime.pixdim(2:4);
         otherwise
             if isnumeric(background)
                 imdat = background;
+                back_img = [];
             else
                 error('Input ''background'' not recognized.')
             end 
@@ -296,22 +274,30 @@ else
             end
         end
         imdat = back_img.img; 
-        pixdim = back_img.hdr.dime.pixdim(2:4);
-        try
-            unit_code = back_img.hdr.dime.xyzt_units(1);
-            switch unit_code
-                case 0, physical_units = '';
-                case 1, physical_units = '(m)';
-                case 2, physical_units = '(mm)';
-                case 3, physical_units = '(microns)';
-                otherwise, physical_units = '';
-            end
-        catch
-            physical_units = '';
-        end
     end
 end
 dim = size(imdat);
+
+% Determine Units:
+if ~isempty(back_img)
+    pixdim = back_img.hdr.dime.pixdim(2:4);
+    try
+        origin = back_img.hdr.hist.originator;
+        switch bitand(back_img.hdr.dime.xyzt_units, 7) % see xform_nii.m, extra_nii_hdr.m
+            case 1, physical_units = '(m)';
+            case 2, physical_units = '(mm)';
+            case 3, physical_units = '(microns)';
+            otherwise, physical_units = '';
+        end
+    catch
+        physical_units = '';
+        origin = back_img.hdr.dime.dim(2:4)/2;
+        warning('Failed to retrieve voxel units.')
+    end
+    if any(origin == 0)
+       origin = back_img.hdr.dime.dim(2:4)/2;
+    end
+end
 
 % Load Background Voxel-wise Color Data if Available
 background_voxel_colors=[];
@@ -324,9 +310,10 @@ end
 
 % Generate Background Patch Data:
 imdat(imdat==0) = nan; phys_dim = pixdim.*dim;
-[x,y,z] = ndgrid(linspace(0,phys_dim(1),dim(1)),...
-    linspace(0,phys_dim(2),dim(2)),...
-    linspace(0,phys_dim(3),dim(3)));
+% [x,y,z] = ndgrid(linspace(0,phys_dim(1),dim(1)),...
+%     linspace(0,phys_dim(2),dim(2)),...
+%     linspace(0,phys_dim(3),dim(3)));
+[x,y,z] = ndgrid(1:dim(1),1:dim(2),1:dim(3));
 XYZ = reshape([x(:),y(:),z(:),ones(numel(x),1)],...
     size(x,1),size(x,2),size(x,3),[]);
 if ~isempty(parsed_inputs.background_colors)
@@ -788,7 +775,7 @@ for axes_iter = 1:n_axes
             handles.titles(axes_iter3) = title(titles{axes_iter3},'Parent',handles.axes(axes_iter3)); 
         end
     end
-    set(handles.axes(axes_iter),'YDir','normal') % this has to be set to reverse; otherwise Left/Right are swapped for zebra finch brain
+    set(handles.axes(axes_iter),'YDir','normal') 
 end
 % Lock Multiple Axes if Requested
 if lock_axes && n_axes>1
@@ -1020,6 +1007,9 @@ end
 if ~isempty(parsed_inputs.zlim)
     change_axes_limits([],[],[],[],[],parsed_inputs.zlim);
 end
+
+% Adjust tick lables (physical or voxel)
+setTickLabels;
 
 % Print: this must go last (after all other operations)
 if ~isempty(parsed_inputs.print)
@@ -1302,36 +1292,81 @@ function change_axes_color(~,~,which_color)
     end
 end
 
-function change_units(~,~,unit_type)
-    if strcmp(h_units(unit_type).Checked,'off')
-        switch unit_type
-            case 1 % Physical
-                h_units(1).Checked = 'on';
-                h_units(2).Checked = 'off';
-                for axes_iter1 = 1:n_axes
-                    set(handles.axes(axes_iter1),'XTickLabelMode','auto','XTickMode','auto',...
-                        'YTickLabelMode','auto','YTickMode','auto',...
-                        'ZTickLabelMode','auto','ZTickMode','auto');
-                    xlabel(handles.axes(axes_iter1),['X ',physical_units]); 
-                    ylabel(handles.axes(axes_iter1),['Y ',physical_units]); 
-                    zlabel(handles.axes(axes_iter1),['Z ',physical_units]);
-                end
-            case 2 % Voxel
-                h_units(1).Checked = 'off';
-                h_units(2).Checked = 'on';
-                for axes_iter1 = 1:n_axes
-                    xtick = round(get(handles.axes(axes_iter1),'XTick')'./pixdim(1));
-                    ytick = round(get(handles.axes(axes_iter1),'YTick')'./pixdim(2));
-                    ztick = round(get(handles.axes(axes_iter1),'ZTick')'./pixdim(3));
-                    set(handles.axes(axes_iter1),'XTickLabel',num2cell(xtick),'XTickMode','manual');
-                    set(handles.axes(axes_iter1),'YTickLabel',num2cell(ytick),'YTickMode','manual');
-                    set(handles.axes(axes_iter1),'ZTickLabel',num2cell(ztick),'ZTickMode','manual');
-                    xlabel(handles.axes(axes_iter1),'X'); 
-                    ylabel(handles.axes(axes_iter1),'Y'); 
-                    zlabel(handles.axes(axes_iter1),'Z');
-                end
-        end
+function setTickLabels
+    xlimits = xlim(handles.axes(1));
+    ylimits = ylim(handles.axes(1));
+    zlimits = zlim(handles.axes(1));
+    xticks = linspace(xlimits(1), xlimits(2), n_ticks);
+    yticks = linspace(ylimits(1), ylimits(2), n_ticks);
+    zticks = linspace(zlimits(1), zlimits(2), n_ticks);
+    if strcmp(h_units(1).Checked,'on') % physical units (round to 3 signif digits)
+        xtick_labs = round( ( xticks - origin(1) ) * pixdim(1), 3, 'significant');
+        yticks_labs = round( ( yticks - origin(2) ) * pixdim(2), 3, 'significant');
+        zticks_labs = round( ( zticks - origin(3) ) * pixdim(3), 3, 'significant');
+        xlab = ['X ',physical_units];
+        ylab = ['Y ',physical_units];
+        zlab = ['Z ',physical_units];
+    else % voxel units (round to whole numbers)
+        xticks = round(xticks);
+        yticks = round(yticks);
+        zticks = round(zticks);
+        xtick_labs = xticks;
+        yticks_labs = yticks;
+        zticks_labs = zticks;
+        xlab = 'X'; ylab = 'Y'; zlab = 'Z';
     end
+    for axes_iter1 = 1:n_axes
+        set(handles.axes(axes_iter1), 'XTick', xticks, ...
+            'XTickLabel',xtick_labs);
+        set(handles.axes(axes_iter1), 'YTick', yticks, ...
+            'YTickLabel',yticks_labs);
+        set(handles.axes(axes_iter1), 'ZTick', zticks, ...
+            'ZTickLabel',zticks_labs);
+        xlabel(handles.axes(axes_iter1), xlab); 
+        ylabel(handles.axes(axes_iter1), ylab); 
+        zlabel(handles.axes(axes_iter1), zlab);
+    end
+end
+
+function change_units(~,~,unit_type)
+    if unit_type == 1 && strcmp(h_units(1).Checked,'off')
+        set(h_units(1), 'Checked', 'on')
+        set(h_units(2), 'Checked', 'off')
+    elseif unit_type == 2 && strcmp(h_units(2).Checked,'off')
+        set(h_units(1), 'Checked', 'off')
+        set(h_units(2), 'Checked', 'on')
+    end
+%     if strcmp(h_units(unit_type).Checked,'off')
+%         switch unit_type
+%             case 1 % Physical
+%                 h_units(1).Checked = 'on';
+%                 h_units(2).Checked = 'off';
+%                 for axes_iter1 = 1:n_axes
+%                     set(handles.axes(axes_iter1),'XTickLabelMode','auto','XTickMode','auto',...
+%                         'YTickLabelMode','auto','YTickMode','auto',...
+%                         'ZTickLabelMode','auto','ZTickMode','auto');
+%                     xlabel(handles.axes(axes_iter1),['X ',physical_units]); 
+%                     ylabel(handles.axes(axes_iter1),['Y ',physical_units]); 
+%                     zlabel(handles.axes(axes_iter1),['Z ',physical_units]);
+%                 end
+%             case 2 % Voxel
+%                 h_units(1).Checked = 'off';
+%                 h_units(2).Checked = 'on';
+%                 for axes_iter1 = 1:n_axes
+%                     xtick = round(get(handles.axes(axes_iter1),'XTick')'./pixdim(1));
+%                     ytick = round(get(handles.axes(axes_iter1),'YTick')'./pixdim(2));
+%                     ztick = round(get(handles.axes(axes_iter1),'ZTick')'./pixdim(3));
+%                     set(handles.axes(axes_iter1),'XTickLabel',num2cell(xtick),'XTickMode','manual');
+%                     set(handles.axes(axes_iter1),'YTickLabel',num2cell(ytick),'YTickMode','manual');
+%                     set(handles.axes(axes_iter1),'ZTickLabel',num2cell(ztick),'ZTickMode','manual');
+%                     xlabel(handles.axes(axes_iter1),'X'); 
+%                     ylabel(handles.axes(axes_iter1),'Y'); 
+%                     zlabel(handles.axes(axes_iter1),'Z');
+%                 end
+%         end
+%     end
+    
+    setTickLabels;
 end
 
 % Change Limits:
@@ -1345,7 +1380,7 @@ function change_axes_limits(~,~,which_axis,xlim,ylim,zlim)
                 if isempty(answer); return; end
                 xlim = [str2double(answer{1}),str2double(answer{2})];
                 for ix = 1:n_axes
-                    set(handles.axes(ix),'XLim',xlim.*pixdim(1));
+                    set(handles.axes(ix),'XLim',xlim);
                 end
             case 2 % Y-axis
                 prompt = {sprintf('Specify Y-Limits in voxels \n\n Lower:'),'Upper:'};
@@ -1354,7 +1389,7 @@ function change_axes_limits(~,~,which_axis,xlim,ylim,zlim)
                 if isempty(answer); return; end
                 ylim = [str2double(answer{1}),str2double(answer{2})];
                 for ix = 1:n_axes
-                    set(handles.axes(ix),'YLim',ylim.*pixdim(2));
+                    set(handles.axes(ix),'YLim',ylim);
                 end 
             case 3 % Z-axis
                 prompt = {sprintf('Specify Z-Limits in voxels \n\n Lower:'),'Upper:'};
@@ -1363,7 +1398,7 @@ function change_axes_limits(~,~,which_axis,xlim,ylim,zlim)
                 if isempty(answer); return; end
                 zlim = [str2double(answer{1}),str2double(answer{2})];
                 for ix = 1:n_axes
-                    set(handles.axes(ix),'ZLim',zlim.*pixdim(3));
+                    set(handles.axes(ix),'ZLim',zlim);
                 end
         end
     else % Command-line Name-Value Pair functionality
@@ -1392,6 +1427,8 @@ function change_axes_limits(~,~,which_axis,xlim,ylim,zlim)
             end
         end 
     end
+    
+    setTickLabels;
 end
 
 function more_display_options(~,~,~)

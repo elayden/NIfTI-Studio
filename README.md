@@ -3,7 +3,7 @@ A Matlab toolbox for NIfTI plotting, editing, and 3D rendering
 
 ## 
 If you find NIfTI-Studio useful and would like to support its continued development, feel free to send a cup of coffee! :) <br><br>
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](elliot.layden@gmail.com)
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://paypal.me/ElliotLayden?locale.x=en_US)
 
 ## Examples
 ### 3D rendering of human MNI brain template with regions of interest (ROIs) and connections

@@ -232,6 +232,7 @@ ax_xlim = []; ax_ylim = [];
 x_slice = []; y_slice = []; z_slice = []; 
 in_motion = false;
 draw_color = 1; 
+erase_draw = false;
 idx_draw = [];
 scroll_count = 0; 
 
@@ -440,14 +441,16 @@ if isempty(parsed_inputs.axes)
     % DRAW    
     draw_menu = uimenu(handles.figure,'Label','Draw');
     h_color_menu = uimenu(draw_menu,'Label','Select Draw Color');
-    h_color = zeros(1,9);
-    for j = 1:9
-        h_color(j) = uimenu(h_color_menu,'Label',num2str(j),...
-            'Callback',{@change_color_callback, j});
-    end
-    set(h_color(1),'Checked','on')
-    uimenu(h_color_menu,'Label','Custom',...
+    h_color = zeros(1,11);
+    h_color(1) = uimenu(h_color_menu,'Label','Erase',...
         'Callback',{@change_color_callback, 0});
+    for j = 2:10
+        h_color(j) = uimenu(h_color_menu,'Label',num2str(j-1),...
+            'Callback',{@change_color_callback, j-1});
+    end
+    set(h_color(2), 'Checked', 'on')
+    h_color(11) = uimenu(h_color_menu,'Label','Custom',...
+        'Callback',{@change_color_callback, 10});
     h_shapes = zeros(1,4);
     h_shapes_menu = uimenu(draw_menu,'Label','Shapes');
     h_shapes(1) = uimenu(h_shapes_menu,'Label','No Shape (Manual Trace)',...
@@ -604,7 +607,6 @@ function load_img(img_type)
     end
     
     % Determine voxel units & origin:
-    d=0;
     try
         origin = img.hdr.hist.originator(1:3);
         switch bitand(img.hdr.dime.xyzt_units, 7) % see xform_nii.m, extra_nii_hdr.m
@@ -1810,8 +1812,8 @@ function purgeUndoRedo(closeWhich)
     
     i = 1;
     while i <= length(undoCache)
-       if undoCache(i).selectedImage == closeWhich && ...
-               ~strcmp(undoCache(i).action, 'reorient') % don't purge 'reorient' actions
+       if (~isempty(undoCache(i).selectedImage) && undoCache(i).selectedImage == closeWhich) || ...
+            (~isempty(undoCache(i).action) && ~strcmp(undoCache(i).action,'reorient')) % don't purge 'reorient' actions
           undoCache(i) = []; 
           undoNum = undoNum - 1;
        else 
@@ -1896,7 +1898,11 @@ function add_border_callback(~,~,~)
             imageData{selectedImage}(idx_border) = draw_color;
             curr_drawing = imageData{selectedImage}(:,:,curr_slice);
             if selectedImage > 1
-                alphaData{selectedImage}(idx_border) = alphaValue{selectedImage};
+                if erase_draw
+                    alphaData{selectedImage}(idx_border) = NaN;
+                else
+                    alphaData{selectedImage}(idx_border) = alphaValue{selectedImage};
+                end
             end
             
             updateImage
@@ -1925,7 +1931,11 @@ function apply2whole_slice_callback(~,~,~)
     % Fill slice w/ color
     imageData{selectedImage}(idx_fill) = draw_color;
     if selectedImage > 1
-        alphaData{selectedImage}(idx_fill) = alphaValue{selectedImage};
+        if erase_draw
+            alphaData{selectedImage}(idx_fill) = NaN;
+        else
+            alphaData{selectedImage}(idx_fill) = alphaValue{selectedImage};
+        end
     end
     updateImage
 end   
@@ -2135,14 +2145,14 @@ function cursor_motion_callback(~,~,~)
     pt = round(pt(1,1:2));
     
     % Check Points:
-    pt_check = sum([(pt>0),(pt<=[length(yind),length(xind)])]);
+    pt_check = sum([(pt>0), (pt<=[length(yind),length(xind)])]);
     if pt_check~=4; return; end
     
     in_motion = true;
     
     if shape==0 % non-shape tracing
         
-        save_points = [save_points; pt(2),pt(1)];
+        save_points = [save_points; pt(2), pt(1)];
         %     updateImage % this turns on tracing of drawings, but decreases performance slightly
         
     elseif shape==1 || shape==2 % Interactively add/remove circles or rectangle
@@ -2185,7 +2195,11 @@ function cursor_motion_callback(~,~,~)
         imageData{selectedImage}(idx_draw) = draw_color;
         if selectedImage > 1
             prev_alpha = alphaData{selectedImage}(idx_draw);
-            alphaData{selectedImage}(idx_draw) = alphaValue{selectedImage};
+            if erase_draw
+                alphaData{selectedImage}(idx_draw) = NaN;
+            else
+                alphaData{selectedImage}(idx_draw) = alphaValue{selectedImage};
+            end
         end
         
         % Update image to show current shape
@@ -2254,7 +2268,11 @@ function cursor_unclick_callback(~,~,~)
     % Add drawing
     imageData{selectedImage}(idx_draw) = draw_color;
     if selectedImage > 1
-        alphaData{selectedImage}(idx_draw) = alphaValue{selectedImage};
+        if erase_draw
+            alphaData{selectedImage}(idx_draw) = NaN;
+        else
+            alphaData{selectedImage}(idx_draw) = alphaValue{selectedImage};
+        end
     end
     
     idx_draw = [];
@@ -2363,24 +2381,31 @@ function change_color_callback(hObject, ~, whichColor)
     
     % Uncheck all:
     for k = 1:length(h_color); set(h_color(k), 'Checked', 'off'); end
+    set(h_color(whichColor + 1), 'Checked', 'on') 
     
-    % Adjust color:
     if whichColor == 0
+        erase_draw = true;
+    else
+        erase_draw = false; 
+    end
+        
+    % Adjust color:
+    if whichColor == 10 % custom
         prompt = {'Image intensity value: '};
         dlg_title = 'Color'; num_lines = [1,25];
         defaultans = {num2str(draw_color)};
-        answer1 = inputdlg(prompt,dlg_title,num_lines,defaultans,'on');
+        answer1 = inputdlg(prompt, dlg_title, num_lines, defaultans, 'on');
         if ~isempty(answer1)
             draw_color = str2double(answer1);
             if isnan(draw_color)
-              errordlg('Please enter a numeric value','Invalid Input','modal')
+              errordlg('Please enter a numeric value', ...
+                  'Invalid Input', 'modal')
               uicontrol(hObject)
               return 
             end
         end
     else
         draw_color = whichColor;
-        set(h_color(whichColor), 'Checked', 'on') 
     end
             
 end
@@ -2443,7 +2468,11 @@ function propagate_draw_callback(~, ~, ~)
         curr_drawing(idx_propagate) = draw_color;
         imageData{selectedImage}(idx_propagate) = draw_color;
         if selectedImage > 1
-            alphaData{selectedImage}(idx_propagate) = alphaValue{selectedImage};
+            if erase_draw
+                alphaData{selectedImage}(idx_propagate) = NaN;
+            else
+                alphaData{selectedImage}(idx_propagate) = alphaValue{selectedImage};
+            end
         end
         
         updateImage

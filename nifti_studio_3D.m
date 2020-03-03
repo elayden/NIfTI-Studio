@@ -1336,36 +1336,6 @@ function change_units(~,~,unit_type)
         set(h_units(1), 'Checked', 'off')
         set(h_units(2), 'Checked', 'on')
     end
-%     if strcmp(h_units(unit_type).Checked,'off')
-%         switch unit_type
-%             case 1 % Physical
-%                 h_units(1).Checked = 'on';
-%                 h_units(2).Checked = 'off';
-%                 for axes_iter1 = 1:n_axes
-%                     set(handles.axes(axes_iter1),'XTickLabelMode','auto','XTickMode','auto',...
-%                         'YTickLabelMode','auto','YTickMode','auto',...
-%                         'ZTickLabelMode','auto','ZTickMode','auto');
-%                     xlabel(handles.axes(axes_iter1),['X ',physical_units]); 
-%                     ylabel(handles.axes(axes_iter1),['Y ',physical_units]); 
-%                     zlabel(handles.axes(axes_iter1),['Z ',physical_units]);
-%                 end
-%             case 2 % Voxel
-%                 h_units(1).Checked = 'off';
-%                 h_units(2).Checked = 'on';
-%                 for axes_iter1 = 1:n_axes
-%                     xtick = round(get(handles.axes(axes_iter1),'XTick')'./pixdim(1));
-%                     ytick = round(get(handles.axes(axes_iter1),'YTick')'./pixdim(2));
-%                     ztick = round(get(handles.axes(axes_iter1),'ZTick')'./pixdim(3));
-%                     set(handles.axes(axes_iter1),'XTickLabel',num2cell(xtick),'XTickMode','manual');
-%                     set(handles.axes(axes_iter1),'YTickLabel',num2cell(ytick),'YTickMode','manual');
-%                     set(handles.axes(axes_iter1),'ZTickLabel',num2cell(ztick),'ZTickMode','manual');
-%                     xlabel(handles.axes(axes_iter1),'X'); 
-%                     ylabel(handles.axes(axes_iter1),'Y'); 
-%                     zlabel(handles.axes(axes_iter1),'Z');
-%                 end
-%         end
-%     end
-    
     setTickLabels;
 end
 

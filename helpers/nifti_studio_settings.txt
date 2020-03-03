@@ -1,6 +1,6 @@
-colorbar_on=1;                                                  
-title_on=1;                                                     
-axis_tick_on=1;                                                 
-extensions={'*.nii';'*.img';'*nii.gz'};                         
-last_nav_dir='C:\Users\PC-3PO\Desktop\NIfTI-Studio\data\human\';
-colorMapStr={'gray'};                                           
+colorbar_on=1;                                                                        
+title_on=1;                                                                           
+axis_tick_on=1;                                                                       
+extensions={'*.nii';'*.img';'*nii.gz'};                                               
+last_nav_dir='C:\Users\PC3PO\Desktop\Zebra_Finch_Conditions\zebra_finches\templates\';
+colorMapStr={'gray'};                                                                 

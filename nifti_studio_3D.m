@@ -282,7 +282,7 @@ dim = size(imdat);
 if ~isempty(back_img)
     pixdim = back_img.hdr.dime.pixdim(2:4);
     try
-        origin = back_img.hdr.hist.originator;
+        origin = back_img.hdr.hist.originator(1:3);
         switch bitand(back_img.hdr.dime.xyzt_units, 7) % see xform_nii.m, extra_nii_hdr.m
             case 1, physical_units = '(m)';
             case 2, physical_units = '(mm)';
@@ -290,12 +290,14 @@ if ~isempty(back_img)
             otherwise, physical_units = '';
         end
     catch
+        warning('Could not obtain origin.')
         physical_units = '';
         origin = back_img.hdr.dime.dim(2:4)/2;
         warning('Failed to retrieve voxel units.')
     end
     if any(origin == 0)
-       origin = back_img.hdr.dime.dim(2:4)/2;
+        warning('Could not obtain origin.')
+        origin = back_img.hdr.dime.dim(2:4)/2;
     end
 end
 
@@ -1293,6 +1295,7 @@ function change_axes_color(~,~,which_color)
 end
 
 function setTickLabels
+    origin
     xlimits = xlim(handles.axes(1));
     ylimits = ylim(handles.axes(1));
     zlimits = zlim(handles.axes(1));
@@ -1300,9 +1303,9 @@ function setTickLabels
     yticks = linspace(ylimits(1), ylimits(2), n_ticks);
     zticks = linspace(zlimits(1), zlimits(2), n_ticks);
     if strcmp(h_units(1).Checked,'on') % physical units (round to 3 signif digits)
-        xtick_labs = round( ( xticks - origin(1) ) * pixdim(1), 3, 'significant');
-        yticks_labs = round( ( yticks - origin(2) ) * pixdim(2), 3, 'significant');
-        zticks_labs = round( ( zticks - origin(3) ) * pixdim(3), 3, 'significant');
+        xtick_labs = round( ( xticks - origin(1) ) .* pixdim(1), 3, 'significant');
+        yticks_labs = round( ( yticks - origin(2) ) .* pixdim(2), 3, 'significant');
+        zticks_labs = round( ( zticks - origin(3) ) .* pixdim(3), 3, 'significant');
         xlab = ['X ',physical_units];
         ylab = ['Y ',physical_units];
         zlab = ['Z ',physical_units];

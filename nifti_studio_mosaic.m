@@ -61,6 +61,7 @@ function [handles] = nifti_studio_mosaic(varargin)
 % 'slice_label_pos', [numeric: 1-6]; (1) = Top Left, (2) = Top Middle, 
 %                    (3) = Top Right, (4) = Bottom left, (5) = Bottom
 %                    Middle, (6) = Bottom Right
+% 'unit_type',   (1) voxel, (2) physical (default)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Waitbar:
@@ -95,20 +96,30 @@ parsed_inputs = struct('background',[],'overlay',[],...
     'background_caxis',[],'overlay_clim',[],'overlay_cmap','jet',...
     'roi_colors',[],'axis_ticks',1,...
     'background_color',zeros(1,3),'mesh_color',[0,0,1],'print',[],'print_res',300,...
-    'show_axes',0,'background_thresh',0.00001,'unit_measure',[],'physical_units','',...
-    'xlim',[],'ylim',[],'slice_labels',1,'slice_label_phys',1,...
-    'slice_label_pos',5,'overlay_3D',0, 'origin_slice', 1,'light_axis','x');
+    'show_axes',1,'background_thresh',0.00001, 'unit_type', 2, ...
+    'physical_units', '', ...
+    'xlim',[],'ylim',[],'slice_labels',1,...
+    'slice_label_pos',6,'overlay_3D',0, 'origin_slice', 1,'light_axis','x');
 
 poss_input = {'background','overlay','slices','title',...
     'dimension','slice_locator','slice_locator_pos','axes_dim',...
     'axes_direction','customize','rotate','overlay_alpha',...
     'background_cmap','background_caxis','overlay_clim','overlay_cmap',...
     'roi_colors','axis_ticks','background_color','mesh_color','print',...
-    'print_res','show_axes','background_thresh','unit_measure','physical_units',...
-    'xlim','ylim','slice_labels','slice_label_phys','slice_label_pos',...
+    'print_res','show_axes','background_thresh','unit_type','physical_units',...
+    'xlim','ylim','slice_labels','slice_label_pos',...
     'overlay_3D', 'origin_slice','light_axis'};
 
 m = 200; % # of colormap entries
+
+% Ticks and TickLabels:
+xticks = []; yticks = [];
+n_ticks_x = 6; n_ticks_y = 10;
+h_xticklabels = [];
+h_yticklabels = [];
+h_units = [0,0];
+x_tick_offset = 0.02;
+y_tick_offset = 0.97;
 
 for i = 1:length(poss_input)
     ind = find(strcmp(poss_input{i},inputs));
@@ -117,6 +128,12 @@ for i = 1:length(poss_input)
         parsed_inputs.(poss_input{i}) = input1;
     end
 end
+
+unit_type = parsed_inputs.unit_type;
+show_axes = parsed_inputs.show_axes;
+
+slice_labels_on = parsed_inputs.slice_labels;
+slice_label_pos = parsed_inputs.slice_label_pos;
 
 % Image:
 background = parsed_inputs.background;
@@ -304,16 +321,6 @@ if ~isempty(parsed_inputs.physical_units) && ischar(parsed_inputs.physical_units
     physical_units = parsed_inputs.physical_units;
 end
 
-% Change unit of measure if specified:
-if ~isempty(parsed_inputs.unit_measure) && ischar(parsed_inputs.unit_measure)
-    if strcmpi('Voxel',parsed_inputs.unit_measure)
-    elseif strcmpi('Physical',parsed_inputs.unit_measure)
-        change_units([],[],2)
-    else
-        warning('Invalid input for ''unit_measure''; disregarded')
-    end
-end
-
 %% Initialize Handles & Options:
 overlay_alpha = parsed_inputs.overlay_alpha;
 background_cmap = parsed_inputs.background_cmap;
@@ -350,9 +357,6 @@ xmin = 1; ymin = 1;
 first_click = [];
 drag_click = [];
 curr_ax = 28.3938;
-slice_labels_on = parsed_inputs.slice_labels;
-slice_label_phys = parsed_inputs.slice_label_phys;
-slice_label_pos = parsed_inputs.slice_label_pos;
 
 handles = struct('figure',[],'title',[],'background_axes',[],...
     'background_images',[],'overlay_axes',[],'overlay_images',[],...
@@ -452,31 +456,21 @@ display_menu = uimenu(handles.figure,'Label','Display');
             uimenu(axes_limits_menu,'Label','X Limits','Callback',{@change_axes_limits,1});
             uimenu(axes_limits_menu,'Label','Y Limits','Callback',{@change_axes_limits,2});
         menu_axis_color = uimenu(axes_menu,'Label','Color');
-            h_ax_color(1) = uimenu(menu_axis_color,'Label','Grey','Checked','on','Callback',{@change_axis_color,1});
+            h_ax_color(1) = uimenu(menu_axis_color,'Label','Grey','Checked','off','Callback',{@change_axis_color,1});
             h_ax_color(2) = uimenu(menu_axis_color,'Label','Black','Checked','off','Callback',{@change_axis_color,2});
-            h_ax_color(3) = uimenu(menu_axis_color,'Label','White','Checked','off','Callback',{@change_axis_color,3});
+            h_ax_color(3) = uimenu(menu_axis_color,'Label','White','Checked','on','Callback',{@change_axis_color,3});
         measurements_menu = uimenu(axes_menu,'Label','Measurements');
-            h_units(1) = uimenu(measurements_menu,'Label','Voxels','Checked','on','Callback',{@change_units,1});
-            h_units(2) = uimenu(measurements_menu,'Label','Physical Units','Checked','off','Callback',{@change_units,2});  
+            h_units(1) = uimenu(measurements_menu,'Label','Voxels','Checked','off','Callback',{@change_units,1});
+            h_units(2) = uimenu(measurements_menu,'Label','Physical Units','Checked','on','Callback',{@change_units,2});  
     slice_labels_menu = uimenu(display_menu,'Label','Slice Labels');
-        slice_labels_type_menu = uimenu(slice_labels_menu,'Label','Type');
-        if slice_labels_on && ~slice_label_phys
-            h_slice_labels_menu(1) = uimenu(slice_labels_type_menu,'Label','Slice #','Checked','on','Callback',@change_slice_labels);
-            h_slice_labels_menu(2) = uimenu(slice_labels_type_menu,'Label','Distance from Origin','Checked','off','Callback',@change_slice_labels);
-        elseif slice_labels_on && slice_label_phys
-            h_slice_labels_menu(1) = uimenu(slice_labels_type_menu,'Label','Slice #','Checked','off','Callback',@change_slice_labels);
-            h_slice_labels_menu(2) = uimenu(slice_labels_type_menu,'Label','Distance from Origin','Checked','on','Callback',@change_slice_labels);
-        elseif ~slice_labels_on
-            h_slice_labels_menu(1) = uimenu(slice_labels_type_menu,'Label','Slice #','Checked','off','Callback',@change_slice_labels);
-            h_slice_labels_menu(2) = uimenu(slice_labels_type_menu,'Label','Distance from Origin','Checked','off','Callback',@change_slice_labels);
-        end
     h_slice_labels_position_menu = uimenu(slice_labels_menu,'Label','Position');
-        h_slice_label_pos_menu(1) = uimenu(h_slice_labels_position_menu,'Label','Top Left','Callback',{@change_slice_labels,1});
-        h_slice_label_pos_menu(2) = uimenu(h_slice_labels_position_menu,'Label','Top Middle','Callback',{@change_slice_labels,2});
-        h_slice_label_pos_menu(3) = uimenu(h_slice_labels_position_menu,'Label','Top Right','Callback',{@change_slice_labels,3});
-        h_slice_label_pos_menu(4) = uimenu(h_slice_labels_position_menu,'Label','Bottom Left','Callback',{@change_slice_labels,4});
-        h_slice_label_pos_menu(5) = uimenu(h_slice_labels_position_menu,'Label','Bottom Middle','Callback',{@change_slice_labels,5});
-        h_slice_label_pos_menu(6) = uimenu(h_slice_labels_position_menu,'Label','Bottom Right','Callback',{@change_slice_labels,6});
+        h_slice_label_pos_menu(1) = uimenu(h_slice_labels_position_menu,'Label','None','Callback',{@change_slice_label_position,1});
+        h_slice_label_pos_menu(2) = uimenu(h_slice_labels_position_menu,'Label','Top Left','Callback',{@change_slice_label_position,2});
+        h_slice_label_pos_menu(3) = uimenu(h_slice_labels_position_menu,'Label','Top Middle','Callback',{@change_slice_label_position,3});
+        h_slice_label_pos_menu(4) = uimenu(h_slice_labels_position_menu,'Label','Top Right','Callback',{@change_slice_label_position,4});
+        h_slice_label_pos_menu(5) = uimenu(h_slice_labels_position_menu,'Label','Bottom Left','Callback',{@change_slice_label_position,5});
+        h_slice_label_pos_menu(6) = uimenu(h_slice_labels_position_menu,'Label','Bottom Middle','Callback',{@change_slice_label_position,6});
+        h_slice_label_pos_menu(7) = uimenu(h_slice_labels_position_menu,'Label','Bottom Right','Callback',{@change_slice_label_position,7});
         set(h_slice_label_pos_menu(slice_label_pos),'Checked','on')
     h_slice_labels_background_menu = uimenu(slice_labels_menu,'Label','Background Color');
         h_slice_label_background_color(1) = uimenu(h_slice_labels_background_menu,'Label','None','Checked','on','Callback',{@change_slice_labels_background,1});
@@ -490,9 +484,9 @@ display_menu = uimenu(handles.figure,'Label','Display');
         h_slice_label_background_color(9) = uimenu(h_slice_labels_background_menu,'Label','White','Callback',{@change_slice_labels_background,9});
         h_slice_label_background_color(10) = uimenu(h_slice_labels_background_menu,'Label','More...','Callback',{@change_slice_labels_background,10});
     slice_label_txt_color = uimenu(slice_labels_menu,'Label','Text Color');
-        h_ax_color(1) = uimenu(slice_label_txt_color,'Label','Black','Checked','off','Callback',{@change_label_txt_color,1});
-        h_ax_color(2) = uimenu(slice_label_txt_color,'Label','White','Checked','on','Callback',{@change_label_txt_color,2});
-        h_ax_color(3) = uimenu(slice_label_txt_color,'Label','Grey','Checked','off','Callback',{@change_label_txt_color,3});
+        h_slice_label_color(1) = uimenu(slice_label_txt_color,'Label','Grey','Checked','off','Callback',{@change_label_txt_color,1});
+        h_slice_label_color(2) = uimenu(slice_label_txt_color,'Label','Black','Checked','on','Callback',{@change_label_txt_color,2});
+        h_slice_label_color(3) = uimenu(slice_label_txt_color,'Label','White','Checked','off','Callback',{@change_label_txt_color,3});
 % Add Overlay Menu if On:
 if overlay_on
     overlay_menu = uimenu(handles.figure,'Label','Overlay');
@@ -545,46 +539,48 @@ end
 if parsed_inputs.customize
     new_plot([], [], 1)
 else
-    plot_mosaic(1)
+    plot_mosaic
 end
 
 % Adjust colormap:
 if overlay_on
     if any(strcmp(parsed_inputs.overlay_cmap, color_spectrums))
-        overlay_colormap_callback(parsed_inputs.overlay_cmap, [], find(strcmp(parsed_inputs.overlay_cmap, color_spectrums)))
+        overlay_colormap_callback(parsed_inputs.overlay_cmap, [], ...
+            find(strcmp(parsed_inputs.overlay_cmap, color_spectrums)))
     else
         warning('Input ''overlay_cmap'' not found as option.')
     end
 end
 
+% Change unit of measure if specified:
+change_units([],[], unit_type)
+
 % Delete waitbar
 clearWaitbar
 
 %% Begin plotting
-function plot_mosaic(initial)
+function plot_mosaic
     % Determine Axes Positions
-    if nargin==1 && initial 
-        row_s = 1/axes_dim(1); 
-        col_s = 1/axes_dim(2);
-        row_l = 1:-row_s:0; row_l = row_l(2:end);
-        col_l = 0:col_s:1; col_l = col_l(1:end-1);
-        count = 0;
-        if axes_direction==2
-            for row = 1:axes_dim(1)
-                for col = 1:axes_dim(2)
-                    if count<numslices
-                        count = count + 1;
-                        ax_pos(count,:) = [col_l(col),row_l(row),col_s,row_s];
-                    end
+    row_s = 1/axes_dim(1); 
+    col_s = 1/axes_dim(2);
+    row_l = 1:-row_s:0; row_l = row_l(2:end);
+    col_l = 0:col_s:1; col_l = col_l(1:end-1);
+    count = 0;
+    if axes_direction==2
+        for row = 1:axes_dim(1)
+            for col = 1:axes_dim(2)
+                if count<numslices
+                    count = count + 1;
+                    ax_pos(count,:) = [col_l(col),row_l(row),col_s,row_s];
                 end
             end
-        elseif axes_direction==1
-            for col = 1:axes_dim(2)
-                for row = 1:axes_dim(1)
-                    if count<numslices
-                        count = count + 1;
-                        ax_pos(count,:) = [col_l(col),row_l(row),col_s,row_s];
-                    end
+        end
+    elseif axes_direction==1
+        for col = 1:axes_dim(2)
+            for row = 1:axes_dim(1)
+                if count<numslices
+                    count = count + 1;
+                    ax_pos(count,:) = [col_l(col),row_l(row),col_s,row_s];
                 end
             end
         end
@@ -675,7 +671,7 @@ function plot_mosaic(initial)
     for ix = 1:numslices
         handles.background_axes(ix) = axes('parent',handles.figure,...
             'position',ax_pos(ix,:),'NextPlot','add','units','normalized',...
-            'color',background_color);
+            'color', background_color);
         colormap(handles.background_axes(ix),background_cmap);
         if ~parsed_inputs.show_axes
             set(handles.background_axes(ix),'Visible','off');
@@ -757,13 +753,26 @@ function plot_mosaic(initial)
         end
     end
     
+    xmin = 1; xmax = slice_dim(1);
+    ymin = 1; ymax = slice_dim(2);
+    
     % Update slice labels
-    if ~initial 
-        change_slice_labels([],[],[])   
+    change_slice_label_position([], [], slice_label_pos)   
+    
+    % Update axes color:
+    if all(background_color==0)
+        change_axis_color([], [], 3) % white
+        change_label_txt_color([], [], 3)
+    else
+        change_axis_color([], [], 1) % grey
+        change_label_txt_color([], [], 1)
     end
     
     % Resize figure based on ratio of x- and y- axes
     resizeFigure
+    
+    % TickLabels:
+    adjust_axes_labels
 end
 
 rotate3d off
@@ -787,9 +796,10 @@ if ~isempty(parsed_inputs.ylim)
 end
 
 % Add Slice Labels if Requested:
-if parsed_inputs.slice_labels
-    change_slice_labels([],[],[],1)
+if ~slice_labels_on
+    slice_label_pos = 1;
 end
+change_slice_label_position([], [], slice_label_pos)
 
 % Print from command line:
 if ~isempty(parsed_inputs.print) && ischar(parsed_inputs.print)
@@ -829,6 +839,7 @@ function scroll_zoom_callback(~, eventdata, ~)
             end
         end
     end
+    adjust_axes_labels
 end
 
 function cursor_click_callback(~,~,~)
@@ -838,8 +849,8 @@ function cursor_click_callback(~,~,~)
     if isempty(pt); return; end % returns [] if outside axes
     first_click = round(pt(1,1:2));
     % Set new callbacks:
-    set(handles.figure,'WindowButtonMotionFcn',@cursor_motion_callback);
-    set(handles.figure,'WindowButtonUpFcn',@cursor_unclick_callback);
+    set(handles.figure,'WindowButtonMotionFcn', @cursor_motion_callback);
+    set(handles.figure,'WindowButtonUpFcn', @cursor_unclick_callback);
 end
 
 function cursor_motion_callback(~,~,~)
@@ -851,10 +862,10 @@ function cursor_motion_callback(~,~,~)
     drag_click = round(pt(1,1:2));
     pan_dir = drag_click-first_click;
     pan_dir = -1.*pan_dir;
-    xmin = xmin+pan_dir(1); 
-    xmax = xmax+pan_dir(1);
-    ymin = ymin+pan_dir(2); 
-    ymax = ymax+pan_dir(2);
+    xmin = xmin + pan_dir(1); 
+    xmax = xmax + pan_dir(1);
+    ymin = ymin + pan_dir(2); 
+    ymax = ymax + pan_dir(2);
     for ix = 1:numslices
         set(handles.background_axes(ix),'XLim',[xmin,xmax],'YLim',[ymin,ymax]);
         if overlay_on && isgraphics(handles.overlay_axes(ix),'axes')
@@ -864,6 +875,7 @@ function cursor_motion_callback(~,~,~)
     if overlay_on
         axes(handles.overlay_axes(1))
     end
+    adjust_axes_labels
 end
 
 function cursor_unclick_callback(~,~,~)
@@ -1129,7 +1141,7 @@ function run_new_plot(~,~,~)
         overlay_slice_data = zeros(slice_dim(1),slice_dim(2),numslices);
     end
 
-    plot_mosaic(1)
+    plot_mosaic
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1216,8 +1228,8 @@ function revert_view(~,~,~)
                 set(handles.background_axes(ix),'Xdir','normal');
         end
         set(handles.background_axes(ix),...
-            'XLim',[1, slice_dim(1)],...
-            'YLim',[1, slice_dim(2)]);
+            'XLim',[xmin, slice_dim(1)],...
+            'YLim',[ymin, slice_dim(2)]);
         
         alpha_background = zeros(size(background_slice));
         alpha_background(background_slice>background_thresh) = 1; 
@@ -1237,8 +1249,8 @@ function revert_view(~,~,~)
                     set(handles.overlay_axes(ix),'Xdir','normal')
             end
             set(handles.overlay_axes(ix),...
-                'XLim',[1, slice_dim(1)],...
-                'YLim',[1, slice_dim(2)]);
+                'XLim',[xmin, slice_dim(1)],...
+                'YLim',[ymin, slice_dim(2)]);
             
             alpha_slice = zeros(size(overlay_slice));
             alpha_slice(overlay_slice>overlay_clim(1)) = overlay_alpha; 
@@ -1307,18 +1319,31 @@ function change_show_axes(hObject,~,~)
     switch hObject.Checked
         case 'on'
             hObject.Checked = 'off'; 
+            show_axes = 0;
             for ix = 1:numslices
                 if isgraphics(handles.background_axes(ix),'axes')
                     set(handles.background_axes(ix),'Visible','off');
                 end
+                
+                % Clear TickLabels
+                for ixx = 1:size(h_xticklabels, 2)
+                    delete(h_xticklabels(ix, ixx))
+                end
+                for ixx = 1:size(h_yticklabels, 2)
+                    delete(h_yticklabels(ix, ixx))
+                end
             end
+            h_xticklabels = [];
+            h_yticklabels = [];
         case 'off'
             hObject.Checked = 'on'; 
+            show_axes = 1;
             for ix = 1:numslices
                 if isgraphics(handles.background_axes(ix),'axes')
                     set(handles.background_axes(ix),'Visible','on');
                 end
             end
+            adjust_axes_labels
     end
 end
 
@@ -1393,8 +1418,8 @@ function change_axes_limits(~,~,which_axis,xlim,ylim)
 end
 
 function change_axis_color(~,~,which_color)
-    for ix = 1:3; h_ax_color(ix).Checked = 'off'; end 
-    h_ax_color(which_color).Checked = 'on';
+    for ix = 1:3; set(h_ax_color(ix),'Checked', 'off'); end 
+    set(h_ax_color(which_color), 'Checked', 'on');
     switch which_color
         case 1 % grey
             grid_color = [.3,.3,.3];
@@ -1418,116 +1443,176 @@ function change_axis_color(~,~,which_color)
     end
 end
 
-function change_units(~,~,unit_type)
-    if strcmp(h_units(unit_type).Checked,'off')
+function change_units(~, ~, unit_type_spec)
+    unit_type = unit_type_spec;
+    if ishandle(h_units(1)) && strcmp(get(h_units(unit_type_spec), 'Checked'),'off')
         switch unit_type
             case 1 % Voxel
-                h_units(1).Checked = 'on';
-                h_units(2).Checked = 'off';
-                for ix = 1:length(handles.background_axes)
-                    set(handles.background_axes(ix),...
-                        'XTickLabelMode','auto','XTickMode','auto',...
-                        'YTickLabelMode','auto','YTickMode','auto');
-                end
+                set(h_units(1), 'Checked', 'on');
+                set(h_units(2), 'Checked', 'off');
             case 2 % Physical
-                h_units(1).Checked = 'off';
-                h_units(2).Checked = 'on';
-                xtick = round((get(handles.background_axes(1),'XTick')' - slice_origin(2)).*slice_pixdim(2),3,'significant');
-                ytick =  round((get(handles.background_axes(1),'YTick')' - slice_origin(1)).*slice_pixdim(1),3,'significant');
-                for ix = 1:length(handles.background_axes)
-                    set(handles.background_axes(ix),...
-                        'XTickLabel',xtick,...
-                        'YTickLabel',ytick);
-                end
+                set(h_units(1), 'Checked', 'off');
+                set(h_units(2), 'Checked', 'on');
         end
+        adjust_axes_labels
     end
 end
 
-function change_slice_labels(hObject,~,change_pos,initial_call)
-    if ~isempty(hObject)
-        which_callback = get(hObject,'Label');
-        switch which_callback
-            case 'Slice #'
-                if strcmp(h_slice_labels_menu(1).Checked,'off')
-                    set(h_slice_labels_menu(1),'Checked','on')
-                    set(h_slice_labels_menu(2),'Checked','off')
-                    slice_labels_on = 1; slice_label_phys = 0;
-                end
-            case 'Distance from Origin'
-                if strcmp(h_slice_labels_menu(2).Checked,'off')
-                    set(h_slice_labels_menu(1),'Checked','off')
-                    set(h_slice_labels_menu(2),'Checked','on')
-                    slice_labels_on = 1; slice_label_phys = 1;
-                end
-            otherwise
-                if nargin>2 && ~isempty(change_pos)
-                    slice_label_pos = change_pos;
-                else
-                    return
-                end
-                for ix = 1:length(h_slice_label_pos_menu)
-                    set(h_slice_label_pos_menu(ix),'Checked','off')
-                end
-                set(h_slice_label_pos_menu(slice_label_pos),'Checked','on')
-        end
+function change_slice_label_position(~, ~, pos)
+    
+    slice_label_pos = pos; 
+    
+    % Adjust menu checkmarks
+    for ix = 1:length(h_slice_label_pos_menu)
+        set(h_slice_label_pos_menu(ix),'Checked','off')
     end
-    if slice_labels_on
+    set(h_slice_label_pos_menu(slice_label_pos),'Checked','on')
+   
+    % Slice labels off
+    if slice_label_pos == 1
         for ix = 1:numslices
-            curr_ax_pos = ax_pos(ix,:);
-            switch slice_label_pos
-                case 1 
-                    annot_pos = [curr_ax_pos(1)+.07*curr_ax_pos(3),...
-                                curr_ax_pos(2)+.93*curr_ax_pos(4),...
-                                .08*curr_ax_pos(3),...
-                                .03];
-                case 2
-                    annot_pos = [curr_ax_pos(1)+.5*curr_ax_pos(3),...
-                                curr_ax_pos(2)+.93*curr_ax_pos(4),...
-                                .08*curr_ax_pos(3),...
-                                .03];
-                case 3
-                    annot_pos = [curr_ax_pos(1)+.86*curr_ax_pos(3),...
-                                curr_ax_pos(2)+.93*curr_ax_pos(4),...
-                                .08*curr_ax_pos(3),...
-                                .03]; 
-                case 4
-                    annot_pos = [curr_ax_pos(1)+.07*curr_ax_pos(3),...
-                                curr_ax_pos(2),...
-                                .08*curr_ax_pos(3),...
-                                .03];
-                case 5
-                    annot_pos = [curr_ax_pos(1)+.44*curr_ax_pos(3),...
-                                curr_ax_pos(2),...
-                                .14*curr_ax_pos(3),...
-                                .04];
-                case 6
-                    annot_pos = [curr_ax_pos(1)+.86*curr_ax_pos(3),...
-                                curr_ax_pos(2),...
-                                .08*curr_ax_pos(3),...
-                                .03];
-            end
-            if slice_label_phys
-                slice_distances(ix) = round((slices(ix)-slice_origin(3))*slice_pixdim(3),3,'significant');
-                curr_str = sprintf('%2.1f',round(slice_distances(ix),1));
-            else
-                curr_str = num2str(slices(ix));
-            end
-            if ~ishandle(handles.h_slice_labels(ix))% nargin>3 && initial_call
-                handles.h_slice_labels(ix) = annotation('textbox','Position',annot_pos,...
-                    'String',curr_str,'FontName','Helvetica','FontSize',14,...
-                    'EdgeColor','none','HorizontalAlignment','center',...
-                    'VerticalAlignment','middle', 'color','w',...
-                        'FitBoxToText','on','Margin',0);
-            else
-                set(handles.h_slice_labels(ix),'Position',annot_pos,...
-                    'String',curr_str,'FontSize',14,'HorizontalAlignment','center',...
-                    'FitBoxToText','on','Margin',0)
+            if ishandle(handles.h_slice_labels(ix))
+                delete(handles.h_slice_labels(ix));
             end
         end
+        
+        return
+    end
+    
+    % Slice labels On
+    for ix = 1:numslices
+        curr_ax_pos = ax_pos(ix,:);
+        
+        % Get position
+        switch slice_label_pos
+            case 2 
+                annot_pos = [curr_ax_pos(1)+.07*curr_ax_pos(3),...
+                            curr_ax_pos(2)+.93*curr_ax_pos(4),...
+                            .08*curr_ax_pos(3),...
+                            .03];
+            case 3
+                annot_pos = [curr_ax_pos(1)+.5*curr_ax_pos(3),...
+                            curr_ax_pos(2)+.93*curr_ax_pos(4),...
+                            .08*curr_ax_pos(3),...
+                            .03];
+            case 4
+                annot_pos = [curr_ax_pos(1)+.86*curr_ax_pos(3),...
+                            curr_ax_pos(2)+.93*curr_ax_pos(4),...
+                            .08*curr_ax_pos(3),...
+                            .03]; 
+            case 5
+                annot_pos = [curr_ax_pos(1)+.07*curr_ax_pos(3),...
+                            curr_ax_pos(2),...
+                            .08*curr_ax_pos(3),...
+                            .03];
+            case 6
+                annot_pos = [curr_ax_pos(1)+.44*curr_ax_pos(3),...
+                            curr_ax_pos(2),...
+                            .14*curr_ax_pos(3),...
+                            .04];
+            case 7
+                annot_pos = [curr_ax_pos(1)+.86*curr_ax_pos(3),...
+                            curr_ax_pos(2),...
+                            .08*curr_ax_pos(3),...
+                            .03];
+        end
+        
+        % Get label
+        if unit_type == 2
+            slice_distances(ix) = round((slices(ix)-slice_origin(3))*slice_pixdim(3),3,'significant');
+            curr_str = sprintf('%2.1f',round(slice_distances(ix),1));
+        else
+            curr_str = num2str(slices(ix));
+        end
+        
+        if ~ishandle(handles.h_slice_labels(ix))% nargin>3 && initial_call
+            handles.h_slice_labels(ix) = annotation('textbox','Position',annot_pos,...
+                'String',curr_str,'FontName','Helvetica','FontSize',14,...
+                'EdgeColor','none','HorizontalAlignment','center',...
+                'VerticalAlignment','middle', 'color','w',...
+                    'FitBoxToText','on','Margin',0);
+        else
+            set(handles.h_slice_labels(ix),'Position',annot_pos,...
+                'String',curr_str,'FontSize',14,'HorizontalAlignment','center',...
+                'FitBoxToText','on','Margin',0)
+        end
+        
     end
 end
 
-function change_slice_labels_background(~,~,which_color)
+% function change_slice_labels(hObject, ~, change_pos)
+%     if ~isempty(hObject)
+%         which_callback = get(hObject, 'Label');
+%         switch which_callback
+%             otherwise
+%                 if nargin>2 && ~isempty(change_pos)
+%                     slice_label_pos = change_pos;
+%                 else
+%                     return
+%                 end
+%                 for ix = 1:length(h_slice_label_pos_menu)
+%                     set(h_slice_label_pos_menu(ix),'Checked','off')
+%                 end
+%                 set(h_slice_label_pos_menu(slice_label_pos),'Checked','on')
+%         end
+%     end
+%     if slice_labels_on
+%         for ix = 1:numslices
+%             curr_ax_pos = ax_pos(ix,:);
+%             switch slice_label_pos
+%                 case 1 
+%                     annot_pos = [curr_ax_pos(1)+.07*curr_ax_pos(3),...
+%                                 curr_ax_pos(2)+.93*curr_ax_pos(4),...
+%                                 .08*curr_ax_pos(3),...
+%                                 .03];
+%                 case 2
+%                     annot_pos = [curr_ax_pos(1)+.5*curr_ax_pos(3),...
+%                                 curr_ax_pos(2)+.93*curr_ax_pos(4),...
+%                                 .08*curr_ax_pos(3),...
+%                                 .03];
+%                 case 3
+%                     annot_pos = [curr_ax_pos(1)+.86*curr_ax_pos(3),...
+%                                 curr_ax_pos(2)+.93*curr_ax_pos(4),...
+%                                 .08*curr_ax_pos(3),...
+%                                 .03]; 
+%                 case 4
+%                     annot_pos = [curr_ax_pos(1)+.07*curr_ax_pos(3),...
+%                                 curr_ax_pos(2),...
+%                                 .08*curr_ax_pos(3),...
+%                                 .03];
+%                 case 5
+%                     annot_pos = [curr_ax_pos(1)+.44*curr_ax_pos(3),...
+%                                 curr_ax_pos(2),...
+%                                 .14*curr_ax_pos(3),...
+%                                 .04];
+%                 case 6
+%                     annot_pos = [curr_ax_pos(1)+.86*curr_ax_pos(3),...
+%                                 curr_ax_pos(2),...
+%                                 .08*curr_ax_pos(3),...
+%                                 .03];
+%             end
+%             if unit_type == 2
+%                 slice_distances(ix) = round((slices(ix)-slice_origin(3))*slice_pixdim(3),3,'significant');
+%                 curr_str = sprintf('%2.1f',round(slice_distances(ix),1));
+%             else
+%                 curr_str = num2str(slices(ix));
+%             end
+%             if ~ishandle(handles.h_slice_labels(ix))% nargin>3 && initial_call
+%                 handles.h_slice_labels(ix) = annotation('textbox','Position',annot_pos,...
+%                     'String',curr_str,'FontName','Helvetica','FontSize',14,...
+%                     'EdgeColor','none','HorizontalAlignment','center',...
+%                     'VerticalAlignment','middle', 'color','w',...
+%                         'FitBoxToText','on','Margin',0);
+%             else
+%                 set(handles.h_slice_labels(ix),'Position',annot_pos,...
+%                     'String',curr_str,'FontSize',14,'HorizontalAlignment','center',...
+%                     'FitBoxToText','on','Margin',0)
+%             end
+%         end
+%     end
+% end
+
+function change_slice_labels_background(~, ~, which_color)
    for ix = 1:9; h_slice_label_background_color(ix).Checked = 'off'; end
     h_slice_label_background_color(which_color).Checked = 'on';
     if which_color==1
@@ -1573,26 +1658,138 @@ function manual_select_labels_background_color(~,~,c_map)
 end
 
 function change_label_txt_color(~,~,which_color)
+    for ix = 1:3; set(h_slice_label_color(ix), 'Checked','off'); end
+    set(h_slice_label_color(which_color), 'Checked','on')
     switch which_color
-        case 1 % black 
-            for ix = 1:numslices
-                if ishandle(handles.h_slice_labels(ix))
-                    set(handles.h_slice_labels(ix),'Color',zeros(1,3)); 
-                end
-            end
-        case 2 % white
-            for ix = 1:numslices
-                if ishandle(handles.h_slice_labels(ix))
-                    set(handles.h_slice_labels(ix),'Color',ones(1,3)); 
-                end
-            end
-        case 3 % grey
+        case 1 % grey 
             for ix = 1:numslices
                 if ishandle(handles.h_slice_labels(ix))
                     set(handles.h_slice_labels(ix),'Color',[.2,.2,.2]); 
                 end
             end
+        case 2 % black
+            for ix = 1:numslices
+                if ishandle(handles.h_slice_labels(ix))
+                    set(handles.h_slice_labels(ix),'Color',zeros(1,3)); 
+                end
+            end
+        case 3 % white
+            for ix = 1:numslices
+                if ishandle(handles.h_slice_labels(ix))
+                    set(handles.h_slice_labels(ix),'Color',ones(1,3)); 
+                end
+            end
     end
+end
+
+function adjust_axes_labels
+    
+    if ~show_axes; return; end
+    
+    axes_properties = get(handles.background_axes(1));
+    
+    xticks = round(linspace(xmin, xmax, n_ticks_x + 2));
+    yticks = round(linspace(ymin, ymax, n_ticks_y + 2));
+    
+    xticks = xticks(2:end-1);
+    yticks = yticks(2:end-1);
+    
+    xtick_norm = (xticks - axes_properties.XLim(1)) / (axes_properties.XLim(2) - axes_properties.XLim(1));
+    ytick_norm = (yticks - axes_properties.YLim(1)) / (axes_properties.YLim(2) - axes_properties.YLim(1));
+    
+    if unit_type == 1 % Voxel
+        xticklabels = sprintfc('%1g', round(xticks));
+        yticklabels = sprintfc('%1g', round(yticks));
+    elseif unit_type == 2 % Physical
+        xticklabels = sprintfc('%.1f', round((xticks - slice_origin(2)) .* slice_pixdim(2), 3, 'significant'));
+        yticklabels = sprintfc('%.1f', round((yticks - slice_origin(1)) .* slice_pixdim(1), 3, 'significant'));
+    end
+    
+    for ix = 1:length(handles.background_axes)
+        
+        set(handles.background_axes(ix), ...
+            'XTick', xticks, ...
+            'YTick', yticks, ...
+            'XTickLabel', {}, ...
+            'YTickLabel', {}, ...
+            'XAxisLocation','top', ...
+            'YAxisLocation','left');
+        
+        if size(h_xticklabels, 1) >= ix
+            if isgraphics(h_xticklabels(ix, 1), 'text')
+                for ixx = 1:size(h_xticklabels,2)
+                    set(h_xticklabels(ix, ixx), ...
+                        'String', xticklabels(ixx),... 
+                        'units', 'normalized', ...
+                        'horizontalalignment', 'center', ...
+                        'FontSize', axes_properties.FontSize, ...
+                        'FontName', axes_properties.FontName, ...
+                        'FontWeight', axes_properties.FontWeight, ...
+                        'FontAngle', axes_properties.FontAngle, ...
+                        'color', axes_properties.XColor, ...
+                        'parent', handles.background_axes(ix));
+                end
+            end
+        else 
+            h_xticklabels(ix, :) = text(xtick_norm, repmat(y_tick_offset, 1, n_ticks_x), xticklabels,... 
+                    'units', 'normalized', ...
+                    'horizontalalignment', 'center', ...
+                    'FontSize', axes_properties.FontSize, ...
+                    'FontName', axes_properties.FontName, ...
+                    'FontWeight', axes_properties.FontWeight, ...
+                    'FontAngle', axes_properties.FontAngle, ...
+                    'color', axes_properties.XColor, ...
+                    'parent', handles.background_axes(ix));
+        end
+
+        if size(h_yticklabels, 1) >= ix
+            if isgraphics(h_yticklabels(ix, 1), 'text')
+                for ixx = 1:size(h_yticklabels, 2)
+                    set(h_yticklabels(ix, ixx), ...
+                        'String', yticklabels(ixx),...
+                        'units', 'normalized', ...
+                        'horizontalalignment', 'left', ...
+                        'FontSize', axes_properties.FontSize, ...
+                        'FontName', axes_properties.FontName, ...
+                        'FontWeight', axes_properties.FontWeight, ...
+                        'FontAngle', axes_properties.FontAngle, ...
+                        'color', axes_properties.XColor, ...
+                        'parent', handles.background_axes(ix));
+                end
+            end
+        else 
+            h_yticklabels(ix, :) = text(repmat(x_tick_offset, 1, n_ticks_y), ytick_norm, yticklabels,...
+                    'units', 'normalized', ...
+                    'horizontalalignment', 'left', ...
+                    'FontSize', axes_properties.FontSize, ...
+                    'FontName', axes_properties.FontName, ...
+                    'FontWeight', axes_properties.FontWeight, ...
+                    'FontAngle', axes_properties.FontAngle, ...
+                    'color', axes_properties.XColor, ...
+                    'parent', handles.background_axes(ix));
+        end
+
+    end
+    
+%     switch unit_type
+%         case 1 % Voxel
+%             for ix = 1:length(handles.background_axes)
+%                 set(handles.background_axes(ix),...
+%                     'XTickLabelMode','auto','XTickMode','auto',...
+%                     'YTickLabelMode','auto','YTickMode','auto',...
+%                     'XAxisLocation','top','YAxisLocation','left');
+%             end
+%         case 2 % Physical
+%             xtick = round((get(handles.background_axes(1),'XTick')' - slice_origin(2)).*slice_pixdim(2), 3, 'significant');
+%             ytick =  round((get(handles.background_axes(1),'YTick')' - slice_origin(1)).*slice_pixdim(1), 3, 'significant');
+%             for ix = 1:length(handles.background_axes)
+%                 set(handles.background_axes(ix),...
+%                     'XTickLabel',xtick,...
+%                     'YTickLabel',ytick);
+%             end
+%     end
+    
+%     [h_xticklabels, h_yticklabels] = ticklabelinside(handles.background_axes, h_xticklabels, h_yticklabels, 0.03); 
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

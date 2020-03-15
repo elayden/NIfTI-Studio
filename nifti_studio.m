@@ -248,7 +248,7 @@ n_ticks_x = 10; n_ticks_y = 10;
 xticks = []; yticks = [];
 
 % Menu Handles:
-orientation_labels = {'Coronal','Sagittal','Axial','3D Display'}; % 'Mosaic'
+orientation_labels = {'Coronal','Sagittal','Axial','3D Display','Mosaic'}; % 'Mosaic'
 menu_orientations = zeros(1,length(orientation_labels)); 
 menu_slice_number = []; menu_colorbar = []; menu_axis_tick = [];
 
@@ -2585,8 +2585,6 @@ function updateImage
         end
     end
     
-    xticks = get(handles.axes{1},'XTick');
-    yticks = get(handles.axes{1},'YTick');
     ax_xlim = [1,numel(yind)];
     ax_ylim = [1,numel(xind)];
     xticks = round(linspace(1, ax_ylim(2), n_ticks_x));

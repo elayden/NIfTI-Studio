@@ -1976,8 +1976,8 @@ function manual_select_overlay_color(~,~,c_map)
 end
 
 function overlay_colormap_callback(hObject,~,which_color)
-    for ix = 1:14; h_overlay_color_spec(ix).Checked = 'off'; end
-    h_overlay_color_spec(which_color).Checked = 'on';
+    for ix = 1:14; set(h_overlay_color_spec(ix), 'Checked', 'off'); end
+    set(h_overlay_color_spec(which_color), 'Checked', 'on');
     if ishandle(hObject)
         cmap_name = get(hObject,'Label');
     elseif ischar(hObject)

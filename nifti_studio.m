@@ -236,6 +236,9 @@ erase_draw = false;
 idx_draw = [];
 scroll_count = 0; 
 
+launch_mosaic_string = 'Mosaic (Beta)';
+launch_3d_string = '3D Display';
+
 % Initialize undo/redo:
 undoNum = 0; undoLimit = 10;
 undoCache = struct('selectedImage', [], 'action', [], ...
@@ -248,7 +251,7 @@ n_ticks_x = 10; n_ticks_y = 10;
 xticks = []; yticks = [];
 
 % Menu Handles:
-orientation_labels = {'Coronal','Sagittal','Axial','3D Display','Mosaic'}; % 'Mosaic'
+orientation_labels = {'Coronal','Sagittal','Axial',launch_3d_string,launch_mosaic_string}; % 'Mosaic'
 menu_orientations = zeros(1,length(orientation_labels)); 
 menu_slice_number = []; menu_colorbar = []; menu_axis_tick = [];
 
@@ -458,7 +461,7 @@ if isempty(parsed_inputs.axes)
     h_shapes(2) = uimenu(h_shapes_menu,'Label','Circle','Callback',{@draw_shapes_callback,1});
     h_shapes(3) = uimenu(h_shapes_menu,'Label','Rectangle','Callback',{@draw_shapes_callback,2});
     h_shapes(4) = uimenu(h_shapes_menu,'Label','Sphere','Callback',{@draw_shapes_callback,3});
-    uimenu(draw_menu,'Label','Propagate through Slices','Callback',@propagate_draw_callback);    
+    uimenu(draw_menu,'Label','Propagate last draw through slices','Callback',@propagate_draw_callback);    
     uimenu(draw_menu,'Label','Add Border','Callback',@add_border_callback);
     uimenu(draw_menu,'Label','Fill Slice','Callback',@apply2whole_slice_callback);
     
@@ -570,7 +573,7 @@ end
 repositionAxes(1);
 
 % Turn on default tool 'crosshair':
-crosshair_callback
+crosshair_callback;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper Functions:
@@ -1180,14 +1183,14 @@ function reorient_callback(hObject, ~, ~)
     reorient_type = get(hObject,'Label');
     
     % Uncheck all menu items
-    if ~strcmp(reorient_type, '3D Display')
+    if ~strcmp(reorient_type, launch_3d_string)
         for i = 1:length(menu_orientations)
             set(menu_orientations(i),'Checked','off'); 
         end
     end
     
     % Add to undoCache
-    if ~strcmp(reorient_type, '3D Display') && nargin < 3
+    if ~strcmp(reorient_type, launch_3d_string) && nargin < 3
         cacheState(selectedImage, 'reorient', slice_orientation, [], [],[])
     end
     
@@ -1258,7 +1261,7 @@ function reorient_callback(hObject, ~, ~)
             xwidth = dim(2)*pixdim(2);
             yheight = dim(3)*pixdim(3);
             
-        case {'3D Display', 'Mosaic'}
+        case {launch_3d_string, launch_mosaic_string}
             
             % Change mouse pointer for busy
             pointer = get(handles.figure, 'Pointer');
@@ -1302,7 +1305,7 @@ function reorient_callback(hObject, ~, ~)
             end
             
             % Generate new plot
-            if strcmp(reorient_type, '3D Display')
+            if strcmp(reorient_type, launch_3d_string)
                 
                 if numel(imageData) > 1
                     [~] = nifti_studio_3D('background',background_img,...
@@ -1313,7 +1316,7 @@ function reorient_callback(hObject, ~, ~)
                         'vox_thresh', quantile(background_img.img(:), background_thresh_3d));
                 end
                 
-            elseif strcmp(reorient_type, 'Mosaic')
+            elseif strcmp(reorient_type, launch_mosaic_string)
                                 
                 if numel(imageData) > 1
                     [~] = nifti_studio_mosaic('background',background_img,...
@@ -1900,6 +1903,10 @@ function add_border_callback(~,~,~)
     answer1 = inputdlg(prompt,dlg_title,num_lines,defaultans,'on');
     if ~isempty(answer1)
         num_voxels_border = str2double(answer1);
+        % Assure max is not beyond image dimensions
+        size(imageData{selectedImage}(xind,yind,curr_slice))
+        num_voxels_border = min(num_voxels_border, ...
+            min(size(imageData{selectedImage}(xind,yind,curr_slice)))-1);
         if num_voxels_border ~= 0
             % Get border indices
             slice_data = false(size(imageData{selectedImage}(xind,yind,curr_slice)));
@@ -2070,7 +2077,7 @@ function keypress_callback(varargin)
         case 'o'
             goToOrigin
         case 'c'
-            crosshair_callback
+            crosshair_callback;
         case 'd'
             draw_callback
 %         case 'z'

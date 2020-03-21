@@ -255,6 +255,7 @@ if ~isempty(background)
             end 
             physical_units = 'unknown';
             pixdim = ones(1,3);
+            origin = size(imdat)./2;
     end
 else
     [background, background_path] = uigetfile({'*.nii';'*.nii.gz';'*.img'},...
@@ -412,7 +413,7 @@ if ~isempty(ROI)
             warning('ROI dimensions do not match background dimensions.')
         end
     end
-    handles.ROI_patches = zeros(n_axes,numrois); % Patch Object Handles
+    handles.ROI_patches = zeros(n_axes, numrois); % Patch Object Handles
     n_conn = numrois*(numrois-1)/2;
     h_line = zeros(n_axes,n_conn);
 else
@@ -1148,7 +1149,7 @@ function change_view(~, ~, which_view)
         case 1, view([-90,0]) % Left
         case 2, view([90,0]) % Right
         case 3, view([180,0]) % Anterior 
-        case 4, view([0,0]) % Posterior
+        case 4, view([-1,0]) % Posterior
         case 5, view([0,90]) % Superior
         case 6, view([180,-90]) % Inferior
     end
@@ -1295,7 +1296,6 @@ function change_axes_color(~,~,which_color)
 end
 
 function setTickLabels
-    origin
     xlimits = xlim(handles.axes(1));
     ylimits = ylim(handles.axes(1));
     zlimits = zlim(handles.axes(1));
@@ -1759,6 +1759,8 @@ function roi_colormap_callback(hObject,~,which_color)
 end
 
 function change_edges_clim(~,~,from_other)
+    if isempty(connmat); return; end
+    
     if nargin<3 || isempty(from_other)
         prompt = {sprintf('Specify color limits: \n\nLower Bound (Negative Threshold):'),'Upper Bound (Positive Threshold):'};
         dlg_title = 'CLim'; num_lines = [1,35;1,35]; 

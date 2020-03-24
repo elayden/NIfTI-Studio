@@ -2,12 +2,7 @@ function [handles] = nifti_studio_3D(varargin)
 % NIfTI Studio 3D  
 %   A GUI for 3D rendering NIfTI images (file types: .nii, .nii.gz, .img/.hdr)
 %   
-% Author:
-%   Elliot Layden, The University of Chicago, 2016-19
-% 
-% Cite: 
-%   Layden, E. A. (2019). NIfTI Studio: A Matlab Toolbox for MRI Image 
-%   Editing and Visualization.
+% Author:  Elliot Layden, University of Chicago, 2016-2019
 % 
 % All inputs are in the form of name-value pair arguments. They may go in
 % any order, as long as each input is preceded by the correct input name in

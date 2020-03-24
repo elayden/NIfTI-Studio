@@ -1,13 +1,8 @@
 function [handles] = nifti_studio_mosaic(varargin)
 % NIfTI Studio Mosaic 
-%   Plot mosaic of slices of a 3D image (.nii/.nii.gz/.img/.hdr)
-%   
-% Author:
-%   Elliot Layden, The University of Chicago, 2016-19
+%   Plot mosaic of slices for a 3D image (.nii/.nii.gz/.img/.hdr)
 % 
-% Cite: 
-%   Layden, E. A. (2019). NIfTI Studio: A Matlab Toolbox for MRI Image 
-%   Editing and Visualization.
+% Author:  Elliot Layden, University of Chicago, 2016-2019
 % 
 % Inputs (name-value pair arguments):
 % 'background',     The main image; Multiple input types allowed:

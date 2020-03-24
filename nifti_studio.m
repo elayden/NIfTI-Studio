@@ -3,12 +3,7 @@ function [handles] = nifti_studio(varargin)
 %   A GUI for navigating, visualizing, and editing 3D NIfTI images 
 %   (file types: .nii, .nii.gz, .img/.hdr)
 % 
-% Author:
-%   Elliot A. Layden, The University of Chicago, 2016-19
-% 
-% Cite: 
-%   Layden, E. A. (2019). NIfTI Studio: A Matlab Toolbox for MRI Image 
-%   Editing and Visualization.
+% Author:  Elliot Layden, University of Chicago, 2016-2019
 % 
 % Usage: 
 % To begin, simply type "nifti_studio" into the command line, adding 
@@ -127,13 +122,11 @@ function [handles] = nifti_studio(varargin)
 %   Link: http://www.mathworks.com/matlabcentral/fileexchange/8797-tools-for-nifti-and-analyze-image
 %   Note that the necessary functions have been included in the 
 %   NIfTI Studio download folder, so no further action is required.
-
+% 
 % Note: colorbars and overlays will not function properly for Matlab
 % versions prior to 2014b, due to the major graphics update which came in
 % 2014b
-
-% Author:  Elliot Layden, University of Chicago, 2016-2019
-% Contact:  elliot.layden@gmail.com
+% 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Load Image and Initialize to Display a Middle Slice:

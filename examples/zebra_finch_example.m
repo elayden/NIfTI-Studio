@@ -27,7 +27,7 @@ handles = nifti_studio_3D('background', template, ...
     'background_smoothness',2, 'background_alpha', .3, ...                      % background / template
     'ROI', rois, 'roi_alpha',1,'roi_smoothness',2, ...                          % ROIs
     'connmat', corrmat, 'connmat_thresh', [-.05, .1], 'edge_thickness',20, ...  % connections / edges
-    'show_axes',0, 'effect','emphasis', 'brightness',.95, 'light_axis','y');  % general appearance
+    'show_axes',0, 'effect','emphasis', 'brightness',.95, 'light_axis','y');    % general appearance
 
 % Tip:  use up/down & left/right arrow keys to rotate brain
 

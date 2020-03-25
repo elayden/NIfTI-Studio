@@ -1,6 +1,8 @@
 # NIfTI-Studio
 A Matlab toolbox for NIfTI and Analyze (img/hdr) image visualization, editing, and 3D rendering
 
+![](https://zenodo.org/badge/DOI/10.5281/zenodo.3725006.svg)
+
 If you find NIfTI-Studio useful and would like to support its continued development, feel free to send a cup of coffee! :) <br><br>
 [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://paypal.me/ElliotLayden?locale.x=en_US)
 

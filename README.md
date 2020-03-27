@@ -6,6 +6,10 @@ A Matlab toolbox for NIfTI and Analyze (img/hdr) image visualization, editing, a
 If you find NIfTI-Studio useful and would like to support its continued development, feel free to send a cup of coffee! :) <br><br>
 [![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://paypal.me/ElliotLayden?locale.x=en_US)
 
+View on Mathworks FileExchange:
+
+[![View NIfTI Studio on File Exchange](https://www.mathworks.com/matlabcentral/images/matlab-file-exchange.svg)](https://www.mathworks.com/matlabcentral/fileexchange/74729-nifti-studio)
+
 ## Installation / Startup
 1. Clone or download the repository
 2. Open Matlab and add the NIfTI-Studio directory to Matlab's path

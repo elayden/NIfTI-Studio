@@ -505,6 +505,7 @@ else
     handles.figure = get(parsed_inputs.insert_axes,'Parent');
     set(handles.figure,'color',background_color);
 end
+figure(handles.figure)
 
 if parsed_inputs.menu_on
     file_menu = uimenu(handles.figure,'Label','File');

@@ -409,6 +409,7 @@ handles.h_slice_labels = repmat(371.38389,1,numslices);
 %% FIGURE AND FILE MENUS:
 handles.figure = figure('menubar','none','color',background_color,'numbertitle',...
     'off','name','','units','norm','Position',[0,0,1,1],'Pointer','hand');  % [.15,.099,.73,.802]
+figure(handles.figure)
 
 % % Try to maximize
 % if verLessThan('matlab','9.4') % R2018a introduced WindowState feature
@@ -976,6 +977,7 @@ function new_plot(~,~,~)
         font_color = [.873,.546,.347];
         h_new_plot_fig = figure('menubar','none','color',zeros(1,3),'numbertitle',...
             'off','name','New Plot Settings','units','norm','Position',[.3,.3,.4,.4]);  % .25,.16,.51,.69
+        figure(h_new_plot_fig)
         slices_txt = uicontrol('Style','text','Parent',h_new_plot_fig,...
             'Units','normalized','Position',[.03,.82,.42,.14],'FontName',...
             'Helvetica','FontSize',12,'BackgroundColor',zeros(1,3),'String',...
@@ -1309,6 +1311,7 @@ function change_background(~, ~, which_color)
     else
         if ~ishandle(h_colorbar_fig)
             h_colorbar_fig = figure('menu','none','Name','Choose Color','NumberTitle','off');
+            figure(h_colorbar_fig);
             h_colorbar_fig.Position(4) = 70; 
             ax_colorbar = gca; set(ax_colorbar,'Position',[0,0,1,1],'Visible','off','nextplot','add');
             c_map = jet(600); c_image = zeros(100,600,3);
@@ -1690,6 +1693,7 @@ function change_slice_labels_background(~, ~, which_color)
     else
         if ~ishandle(h_overlay_colorbar_fig)
             h_overlay_colorbar_fig = figure('menu','none','Name','Choose Color','NumberTitle','off');
+            figure(h_overlay_colorbar_fig)
             h_overlay_colorbar_fig.Position(4) = 70; 
             ax_colorbar = gca; set(ax_colorbar,'Position',[0,0,1,1],'Visible','off','nextplot','add');
             c_map = jet(600); c_image = zeros(100,600,3);
@@ -1954,6 +1958,7 @@ function change_overlay_single_colors(~,~,which_color)
     else
         if ~ishandle(h_overlay_colorbar_fig)
             h_overlay_colorbar_fig = figure('menu','none','Name','Choose Color','NumberTitle','off');
+            figure(h_overlay_colorbar_fig)
             h_overlay_colorbar_fig.Position(4) = 70; 
             ax_colorbar = gca; set(ax_colorbar,'Position',[0,0,1,1],'Visible','off','nextplot','add');
             c_map = jet(600); c_image = zeros(100,600,3);

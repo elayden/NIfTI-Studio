@@ -190,6 +190,7 @@ if any(figure_pos<=0) % avoid ScreenSize errors
     figure_pos = [342,50,683,660]; 
     screen_res = [1,1,(figure_pos(3:4)./[.5,.86])];
 end
+
 if isempty(parsed_inputs.axes) % if no axes supplied
     handles.figure = figure('Position',figure_pos,'MenuBar','none',...
         'Name','NIfTI Studio','NumberTitle','off','Color',figure_color,...
@@ -197,6 +198,7 @@ if isempty(parsed_inputs.axes) % if no axes supplied
 else
     handles.figure = get(parsed_inputs.axes,'Parent');
 end
+figure(handles.figure)
  
 % Intialize GUI Data:
 selectedImage = 1;
@@ -318,16 +320,22 @@ else
 end
 
 % Get Settings:
-getSettings % extracts custom settings from .txt if available
+succeeded = getSettings; % extracts custom settings from .txt if available
 
 if ~isempty(parsed_inputs.title_on)
     title_on = parsed_inputs.title_on; 
+elseif ~succeeded
+    title_on = true;
 end
 if ~isempty(parsed_inputs.axis_tick_on)
     axis_tick_on = parsed_inputs.axis_tick_on;
+elseif ~succeeded
+    axis_tick_on = true;
 end
 if ~isempty(parsed_inputs.colorbar_on)
     colorbar_on = parsed_inputs.colorbar_on;
+elseif ~succeeded
+    colorbar_on = true;
 end
 
 % Background: Get Input Filename & Load
@@ -784,7 +792,7 @@ function openNewOverlay(~, ~, load_type)
     end
     
     % Create new axes:
-    handles.axes{selectedImage} = axes('Visible','off','YDir','reverse'); % must remain invisible
+    handles.axes{selectedImage} = axes('parent', handles.figure, 'Visible','off','YDir','reverse'); % must remain invisible
     handles.axes{selectedImage}.CLim = [cmin{selectedImage}, cmax{selectedImage}];
 
     % Add new colormap:
@@ -821,7 +829,7 @@ function createOverlay(~,~,~)
     cmax{selectedImage} = 1;
     
     % Create new axes:
-    handles.axes{selectedImage} = axes('Visible','off','YDir','reverse'); % must remain invisible
+    handles.axes{selectedImage} = axes('parent', handles.figure, 'Visible','off','YDir','reverse'); % must remain invisible
     handles.axes{selectedImage}.CLim = [cmin{selectedImage}, cmax{selectedImage}];
     
     % Add new colormap:
@@ -904,10 +912,11 @@ function resizeFigure
     handles.figure.Position = figure_pos;
 end
 
-function getSettings
+function success = getSettings
     listing = dir(fullfile(script_path, 'helpers', 'nifti_studio_settings.txt'));
     if isempty(listing)
         disp('No customized settings file found:  missing file ''nifti_studio_settings.txt''.')
+        success = false;
         return
     end
     gui_settings = importdata(fullfile(script_path, 'helpers', listing(1).name));
@@ -916,6 +925,7 @@ function getSettings
         eval([customizable{ix1}, '=[', gui_settings{ix1}(ind+1:end),'];']);
     end
     if ~isdir(last_nav_dir); last_nav_dir = pwd; end %#ok
+    success = true;
 end
 
 function write_settings
@@ -937,11 +947,15 @@ function write_settings
     gui_settings = char(gui_settings);
     
     % Write as Text File:
-    fileID = fopen(fullfile(script_path, 'helpers', 'nifti_studio_settings.txt'),'w');
-    for ix1 = 1:6
-        fprintf(fileID,'%s\r\n',gui_settings(ix1,:));
+    try 
+        fileID = fopen(fullfile(script_path, 'helpers', 'nifti_studio_settings.txt'),'w');
+        for ix1 = 1:6
+            fprintf(fileID,'%s\r\n',gui_settings(ix1,:));
+        end
+        fclose(fileID);
+    catch
+        warning('Failed to cache settings.')
     end
-    fclose(fileID);
 end
 
 function revert_defaults(~,~,~)

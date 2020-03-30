@@ -6,10 +6,6 @@ function [handles] = nifti_studio(varargin)
 % Author:
 %   Elliot A. Layden, The University of Chicago, 2016-19
 % 
-% Cite: 
-%   Layden, E. A. (2019). NIfTI Studio: A Matlab Toolbox for MRI Image 
-%   Editing and Visualization.
-% 
 % Usage: 
 % To begin, simply type "nifti_studio" into the command line, adding 
 % any desired name-value pair arguments. Alternatively, simply right-click 
@@ -744,12 +740,14 @@ function openNewOverlay(~, ~, load_type)
                 return
             end
         case 'struct'
+            overlayName = 'Overlay 1';
             try
                 overlay1_img = parsed_inputs.(poss_input{2});
             catch
                 error('Error loading overlay image. Check fields and retry or load through GUI.')
             end
         case 'matrix'
+            overlayName = 'Overlay 1';
             overlay1_img = img;
             overlay1_img.img = parsed_inputs.(poss_input{2});
     end

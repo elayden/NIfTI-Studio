@@ -5,7 +5,7 @@ A Matlab toolbox for NIfTI and Analyze (img/hdr) image visualization, editing, a
 
 <b>Cite:</b>
 
-Layden, E. A. (2020). NIfTI-Studio: a Matlab toolbox for NIfTI and Analyze image visualization, editing, and 3D rendering. Zenodo. http://doi.org/10.5281/zenodo.3735471
+Layden, E. A. (2020). NIfTI-Studio: a Matlab toolbox for NIfTI and Analyze image visualization, editing, and 3D rendering. Zenodo. http://doi.org/10.5281/zenodo.3725006
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3725006.svg)](https://doi.org/10.5281/zenodo.3725006)
 

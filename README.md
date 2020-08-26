@@ -40,8 +40,8 @@ Code:  [human_example.m](https://github.com/elayden/NIfTI-Studio/blob/master/exa
 Code:  [zebra_finch_example.m](https://github.com/elayden/NIfTI-Studio/blob/master/examples/zebra_finch_example.m)
 
 <p float="middle">
-  <img src="https://github.com/elayden/NIfTI-Studio/blob/master/examples/zebra_finch_brain_3d_rois_connections.png" width="450" />
-  <img src="https://github.com/elayden/NIfTI-Studio/blob/master/examples/zebra_finch_brain_3d_rois_connections_2.png" width="450" /> 
+  <img src="https://github.com/elayden/NIfTI-Studio/blob/master/examples/zebra_finch_brain_3d_rois_connections.png" width="400" />
+  <img src="https://github.com/elayden/NIfTI-Studio/blob/master/examples/zebra_finch_brain_3d_rois_connections_2.png" width="400" /> 
 </p>   
 
 ### Slice mosaic of zebra finch brain template with ROIs

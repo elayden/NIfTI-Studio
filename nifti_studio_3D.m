@@ -402,7 +402,7 @@ if ~isempty(ROI)
         if all(roi_dim==dim)
             cmap = jet(num_roi_colors);
             roi_patch = struct('p',cell(1,numrois),'sphere',cell(1,numrois)); 
-%             roi_colors = zeros(numrois,3); 
+            roi_colors = zeros(numrois,3); 
             roi_vertices = cell(numrois,8); 
             for i = 1:numrois
                 roi_patch(i).p = isosurface(XYZ(:,:,:,1),XYZ(:,:,:,2),XYZ(:,:,:,3), ...
@@ -414,7 +414,7 @@ if ~isempty(ROI)
                 for n = 2:8
                     roi_vertices{i,n} = A*roi_vertices{i,n-1}; 
                 end
-%                 roi_colors(i,:) = cmap(round((i/numrois)*num_roi_colors),:);
+                roi_colors(i,:) = cmap(round((i/numrois)*num_roi_colors),:);
             end
         else
             warning('ROI dimensions do not match background dimensions.')
@@ -717,7 +717,6 @@ for axes_iter = 1:n_axes
         for i = 1:numrois
             roi_patch(i).p.vertices = roi_vertices{i, roi_smoothness}; %#ok
             
-            disp(i)
             handles.ROI_patches(axes_iter,i) = patch(roi_patch(i).p,...
                 'Parent',handles.axes(axes_iter),'EdgeColor','none','FaceVertexCData',...
                 cmap(round(roi_patch(i).p.facevertexcdata), :),'FaceColor','interp',...

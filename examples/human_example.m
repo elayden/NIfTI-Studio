@@ -53,6 +53,23 @@ handles = nifti_studio_3D('background', GM, ...
 
 % Desired output:  human_brain_3d_rois_connections.png
 
+%% Plot 3D rendered spherical ROIs with a random color overlay
+% Note: this could be useful for plotting a statistical overlay on a
+% cluster
+
+% Generate random colors in range (-5, 5):
+img = load_nii(fullfile(nifti_studio_path, '\data\human\spherical_rois.nii'));
+a = -5;
+b = 5;
+img.img = (b-a).*rand(size(img.img)) + a;
+save_nii(img, fullfile(nifti_studio_path, '\data\human\spherical_rois_colors.nii'))
+
+% Plot:
+handles = nifti_studio_3D('background', GM, ...
+    'ROI', fullfile(nifti_studio_path, '\data\human\spherical_rois.nii'),...
+    'ROI_colors', fullfile(nifti_studio_path, '\data\human\spherical_rois_colors.nii'),...
+    'connmat', connmat); %#ok
+
 %% Plot mosaic of slices:
 handles = nifti_studio_mosaic('background', GM, ...
     'overlay', fullfile(nifti_studio_path, '\data\human\spherical_rois.nii'),...

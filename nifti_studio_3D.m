@@ -49,10 +49,6 @@ function [handles] = nifti_studio_3D(varargin)
 %                   subscript indices of an ROI (row: voxel #; column:
 %                   [x,y,z] subscripts).
 %
-% 'ROI_values',     numeric vector of values corresponding to a value for
-%                   each ROI; indices of ROI_values correspond to the
-%                   ROI label numbers (i.e., ROI==2 gets ROI_values(2))
-% 
 % 'ROI_colors',     same input types as 'ROI', denoting a 3D image
 %                   of size equal to 'ROI'; values of voxels
 %                   denote voxelwise colors to be applied to ROI
@@ -181,7 +177,7 @@ addpath(genpath(script_path))
 % Retrieve name-value pair inputs:
 inputs = varargin;
 parsed_inputs = struct('background',[],'background_colors',[],'ROI',[],...
-    'ROI_values',[],'ROI_colors',[],'connmat',[],'connmat_thresh',[0,0],'titles',[],...
+    'ROI_colors',[],'connmat',[],'connmat_thresh',[0,0],'titles',[],...
     'insert_axes',[],'print',[],'print_res',300,'view_spec',[],...
     'view_angle',[],'cam_pos',[],'cam_roll',[],'roi_labels',[],...
     'roi_colors',[],'roi_cmap',[],'vox_thresh',0,'effect',[],...

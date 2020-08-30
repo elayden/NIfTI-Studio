@@ -42,11 +42,16 @@ function [handles] = nifti_studio_3D(varargin)
 %                       surface; color scheme can be later changed by
 %                       changing the colormap or color axis in GUI
 % 
-% 'ROI',            Character/String: specified as a filename for a 3D 
+% 'ROI',            -Character/String: specified as a filename for a 3D 
 %                   image of ROIs, denoted by sequential integer voxel 
-%                   values. -Cell Array: wherein each cell contains the
+%                   values. 
+%                   -Cell Array: wherein each cell contains the
 %                   subscript indices of an ROI (row: voxel #; column:
 %                   [x,y,z] subscripts).
+%
+% 'ROI_values',     numeric vector of values corresponding to a value for
+%                   each ROI; indices of ROI_values correspond to the
+%                   ROI label numbers (i.e., ROI==2 gets ROI_values(2))
 % 
 % 'ROI_colors',     same input types as 'ROI', denoting a 3D image
 %                   of size equal to 'ROI'; values of voxels
@@ -176,7 +181,7 @@ addpath(genpath(script_path))
 % Retrieve name-value pair inputs:
 inputs = varargin;
 parsed_inputs = struct('background',[],'background_colors',[],'ROI',[],...
-    'ROI_colors',[],'connmat',[],'connmat_thresh',[0,0],'titles',[],...
+    'ROI_values',[],'ROI_colors',[],'connmat',[],'connmat_thresh',[0,0],'titles',[],...
     'insert_axes',[],'print',[],'print_res',300,'view_spec',[],...
     'view_angle',[],'cam_pos',[],'cam_roll',[],'roi_labels',[],...
     'roi_colors',[],'roi_cmap',[],'vox_thresh',0,'effect',[],...
@@ -373,41 +378,47 @@ else
     n_axes = 1; handles.axes = 12.32324;
 end
 
-% Load ROI Voxel-wise Color Data if Available
-roi_voxel_colors=[];
-if ~isempty(parsed_inputs.ROI_colors)
-    [roi_voxel_colors,~,~] = load_ROI(parsed_inputs.ROI_colors,dim,'ROI_colors');
-    roi_voxel_colors(imdat<vox_thresh) = nan;
-%     roi_cmin = min(roi_voxel_colors(:));
-%     roi_cmax = max(roi_voxel_colors(:));
-end
-
 % Load ROI Image & Create Patch Data:
 if ~isempty(ROI)
-    [roidat,numrois,roi_dim] = load_ROI(ROI,dim,'ROI');
+    [roidat, numrois, roi_dim] = load_ROI(ROI, dim, 'ROI');
     roidat(roidat==0) = nan; % roi_dim = size(roidat); numrois = max(roidat(:));
+%     disp(['Num ROIs:  ', num2str(numrois)]) %TODO
+    
+    % Load ROI Voxel-wise Color Data if Available
+    if ~isempty(parsed_inputs.ROI_colors)
+        [roi_voxel_colors, ~, ~] = load_ROI(parsed_inputs.ROI_colors, dim, 'ROI_colors');
+    else
+        roi_voxel_colors = roidat;
+    end
+    
+    % Map colors to indices:
+    num_roi_colors = 200; %min(300, numel(unique(roi_voxel_colors((roi_voxel_colors(:)~=0) + (~isnan(roi_voxel_colors(:))) == 2))));
+    roi_voxel_clim = [min(roi_voxel_colors(:)), max(roi_voxel_colors(:))];
+    roi_voxel_color_ind = min(num_roi_colors, round( (num_roi_colors-1) * (roi_voxel_colors - roi_voxel_clim(1)) / (abs(diff(roi_voxel_clim))) ) + 1);
+%     roi_voxel_color_ind(imdat < vox_thresh) = nan;
+    roi_voxel_color_ind(roidat == 0) = nan;
+    roi_voxel_colors = roi_voxel_color_ind;
+
+%     disp(['ROI colors: ',  num2str(numel(unique((roi_voxel_colors((roi_voxel_colors(:)~=0) + (~isnan(roi_voxel_colors(:))) == 2)))))]) %TODO
+    
     % Create Patches:
-    if numrois>0
+    if numrois > 0
         if all(roi_dim==dim)
-            cmap = jet(100);
+            cmap = jet(num_roi_colors);
             roi_patch = struct('p',cell(1,numrois),'sphere',cell(1,numrois)); 
-            roi_colors = zeros(numrois,3); roi_vertices = cell(numrois,8); 
+%             roi_colors = zeros(numrois,3); 
+            roi_vertices = cell(numrois,8); 
             for i = 1:numrois
-                if ~isempty(parsed_inputs.ROI_colors)
-                    roi_patch(i).p = isosurface(XYZ(:,:,:,1),XYZ(:,:,:,2),XYZ(:,:,:,3), ...
-                        roidat==i, isovalue, roi_voxel_colors);
-                else
-                    roi_patch(i).p = isosurface(XYZ(:,:,:,1),XYZ(:,:,:,2),XYZ(:,:,:,3), ...
-                        roidat==i, isovalue);
-                end
+                roi_patch(i).p = isosurface(XYZ(:,:,:,1),XYZ(:,:,:,2),XYZ(:,:,:,3), ...
+                    roidat==i, isovalue, roi_voxel_colors);
                 A = double(sparse(repmat(roi_patch(i).p.faces,3,1),...
-                    repmat(roi_patch(i).p.faces,1,3), 1)>0);
+                        repmat(roi_patch(i).p.faces,1,3), 1)>0);
                 A = sparse(1:size(A,1),1:size(A,1),1./sum(A,2))*A;
                 roi_vertices{i,1} = roi_patch(i).p.vertices;
                 for n = 2:8
                     roi_vertices{i,n} = A*roi_vertices{i,n-1}; 
                 end
-                roi_colors(i,:) = cmap(round((i/numrois)*100),:);
+%                 roi_colors(i,:) = cmap(round((i/numrois)*num_roi_colors),:);
             end
         else
             warning('ROI dimensions do not match background dimensions.')
@@ -416,6 +427,7 @@ if ~isempty(ROI)
     handles.ROI_patches = zeros(n_axes, numrois); % Patch Object Handles
     n_conn = numrois*(numrois-1)/2;
     h_line = zeros(n_axes,n_conn);
+
 else
     roi_patch = []; connmat = []; h_line = []; numrois = 0;
 end
@@ -603,17 +615,19 @@ if parsed_inputs.menu_on
                 ROI_patches_single_colors(8) = uimenu(roi_single_colors_menu,'Label','More...','Callback',{@change_roi_single_colors,8});
             roi_color_spectrum_menu = uimenu(roi_colors_menu,'Label','Color Spectrum');
                 ROI_patches_color_spec(1) = uimenu(roi_color_spectrum_menu,'Label','jet','Callback',{@roi_colormap_callback,1});
-                ROI_patches_color_spec(2) = uimenu(roi_color_spectrum_menu,'Label','hot','Callback',{@roi_colormap_callback,2});
-                ROI_patches_color_spec(3) = uimenu(roi_color_spectrum_menu,'Label','cool','Callback',{@roi_colormap_callback,3});
-                ROI_patches_color_spec(4) = uimenu(roi_color_spectrum_menu,'Label','hsv','Callback',{@roi_colormap_callback,4});
-                ROI_patches_color_spec(5) = uimenu(roi_color_spectrum_menu,'Label','bone','Callback',{@roi_colormap_callback,5});
-                ROI_patches_color_spec(6) = uimenu(roi_color_spectrum_menu,'Label','colorcube','Callback',{@roi_colormap_callback,6});
-                ROI_patches_color_spec(7) = uimenu(roi_color_spectrum_menu,'Label','copper','Callback',{@roi_colormap_callback,7});
-                ROI_patches_color_spec(8) = uimenu(roi_color_spectrum_menu,'Label','spring','Callback',{@roi_colormap_callback,8});
-                ROI_patches_color_spec(9) = uimenu(roi_color_spectrum_menu,'Label','summer','Callback',{@roi_colormap_callback,9});
-                ROI_patches_color_spec(10) = uimenu(roi_color_spectrum_menu,'Label','winter','Callback',{@roi_colormap_callback,10});
-                ROI_patches_color_spec(11) = uimenu(roi_color_spectrum_menu,'Label','pink','Callback',{@roi_colormap_callback,11});
-                ROI_patches_color_spec(12) = uimenu(roi_color_spectrum_menu,'Label','gray','Callback',{@roi_colormap_callback,12});
+                ROI_patches_color_spec(2) = uimenu(roi_color_spectrum_menu,'Label','Red-Blue','Callback',{@roi_colormap_callback,2});
+                ROI_patches_color_spec(3) = uimenu(roi_color_spectrum_menu,'Label','Blue-White-Red','Callback',{@roi_colormap_callback,3});
+                ROI_patches_color_spec(4) = uimenu(roi_color_spectrum_menu,'Label','hot','Callback',{@roi_colormap_callback,4});
+                ROI_patches_color_spec(5) = uimenu(roi_color_spectrum_menu,'Label','cool','Callback',{@roi_colormap_callback,5});
+                ROI_patches_color_spec(6) = uimenu(roi_color_spectrum_menu,'Label','hsv','Callback',{@roi_colormap_callback,6});
+                ROI_patches_color_spec(7) = uimenu(roi_color_spectrum_menu,'Label','bone','Callback',{@roi_colormap_callback,7});
+                ROI_patches_color_spec(8) = uimenu(roi_color_spectrum_menu,'Label','colorcube','Callback',{@roi_colormap_callback,8});
+                ROI_patches_color_spec(9) = uimenu(roi_color_spectrum_menu,'Label','copper','Callback',{@roi_colormap_callback,9});
+                ROI_patches_color_spec(10) = uimenu(roi_color_spectrum_menu,'Label','spring','Callback',{@roi_colormap_callback,10});
+                ROI_patches_color_spec(11) = uimenu(roi_color_spectrum_menu,'Label','summer','Callback',{@roi_colormap_callback,11});
+                ROI_patches_color_spec(12) = uimenu(roi_color_spectrum_menu,'Label','winter','Callback',{@roi_colormap_callback,12});
+                ROI_patches_color_spec(13) = uimenu(roi_color_spectrum_menu,'Label','pink','Callback',{@roi_colormap_callback,13});
+                ROI_patches_color_spec(14) = uimenu(roi_color_spectrum_menu,'Label','gray','Callback',{@roi_colormap_callback,14});
     end
     if ~isempty(connmat)
     edges_menu = uimenu(handles.figure,'Label','Connections');
@@ -705,18 +719,19 @@ for axes_iter = 1:n_axes
     if ~isempty(roi_patch)
         hold on;
         for i = 1:numrois
-            roi_patch(i).p.vertices = roi_vertices{i,roi_smoothness}; %#ok
-            if ~isempty(parsed_inputs.ROI_colors)
-                handles.ROI_patches(axes_iter,i) = patch(roi_patch(i).p,...
-                    'Parent',handles.axes(axes_iter),'EdgeColor','none','FaceVertexCData',...
-                    roi_patch(i).p.facevertexcdata,'FaceColor','interp',...
-                    'AlphaDataMapping','none','FaceLighting','gouraud','FaceAlpha',roi_alpha);
-            else
-                handles.ROI_patches(axes_iter,i) = patch(roi_patch(i).p,...
-                    'Parent',handles.axes(axes_iter),'EdgeColor','none','FaceVertexCData',...
-                    repmat(roi_colors(i,:),size(roi_patch(i).p.vertices,1),1),'FaceColor','interp',...
-                    'AlphaDataMapping','none','FaceLighting','gouraud','FaceAlpha',roi_alpha);
-            end
+            roi_patch(i).p.vertices = roi_vertices{i, roi_smoothness}; %#ok
+            
+            disp(i)
+            handles.ROI_patches(axes_iter,i) = patch(roi_patch(i).p,...
+                'Parent',handles.axes(axes_iter),'EdgeColor','none','FaceVertexCData',...
+                cmap(round(roi_patch(i).p.facevertexcdata), :),'FaceColor','interp',...
+                'AlphaDataMapping','none','FaceLighting','gouraud','FaceAlpha',roi_alpha);
+%             else
+%                 handles.ROI_patches(axes_iter,i) = patch(roi_patch(i).p,...
+%                     'Parent',handles.axes(axes_iter),'EdgeColor','none','FaceVertexCData',...
+%                     repmat(roi_colors(i,:),size(roi_patch(i).p.vertices,1),1),'FaceColor','interp',...
+%                     'AlphaDataMapping','none','FaceLighting','gouraud','FaceAlpha',roi_alpha);
+%             end
         end
     end
 
@@ -727,7 +742,7 @@ for axes_iter = 1:n_axes
         conndat = connmat1(triu(true(numrois),1));
         non_nan = ((conndat<=connmat_thresh(1))+(conndat>=connmat_thresh(2)))>0;
         conndat(~non_nan) = nan;
-        m = 64; 
+        m = 200; 
         % Color Mapping
         if ~isempty(parsed_inputs.edge_clim)
             cmin = parsed_inputs.edge_clim(1);
@@ -1573,19 +1588,19 @@ function change_roi_smooth(hObject,~,~)
     roi_smoothness = round(hObject.Value);
     for axes_iter1 = 1:n_axes
         for ix = 1:numrois
-        delete(handles.ROI_patches(axes_iter1,ix))
-        roi_patch(ix).p.vertices = roi_vertices{ix,roi_smoothness};
-        if ~isempty(parsed_inputs.ROI_colors)
+            delete(handles.ROI_patches(axes_iter1,ix))
+            roi_patch(ix).p.vertices = roi_vertices{ix,roi_smoothness};
+    %         if ~isempty(parsed_inputs.ROI_colors)
             handles.ROI_patches(axes_iter1,ix) = patch(roi_patch(ix).p,...
                 'Parent',handles.axes(axes_iter1),'EdgeColor','none','FaceVertexCData',...
-                roi_patch(ix).p.facevertexcdata,'FaceColor','interp',...
+                cmap(round(roi_patch(ix).p.facevertexcdata), :),'FaceColor','interp',...
                 'AlphaDataMapping','none','FaceLighting','gouraud','FaceAlpha',roi_alpha);
-        else
-            handles.ROI_patches(axes_iter1,ix) = patch(roi_patch(ix).p,...
-                'Parent',handles.axes(axes_iter1),'EdgeColor','none','FaceVertexCData',...
-                repmat(roi_colors(ix,:),size(roi_patch(ix).p.vertices,1),1),'FaceColor','interp',...
-                'AlphaDataMapping','none','FaceLighting','gouraud','FaceAlpha',roi_alpha);
-        end
+%         else
+%             handles.ROI_patches(axes_iter1,ix) = patch(roi_patch(ix).p,...
+%                 'Parent',handles.axes(axes_iter1),'EdgeColor','none','FaceVertexCData',...
+%                 repmat(roi_colors(ix,:),size(roi_patch(ix).p.vertices,1),1),'FaceColor','interp',...
+%                 'AlphaDataMapping','none','FaceLighting','gouraud','FaceAlpha',roi_alpha);
+%         end
 %         isonormals(roidat==axes_iter1,handles.ROI_patches(axes_iter1,ix)) 
         end
     end
@@ -1624,7 +1639,7 @@ function change_sphere_size(hObject,~,~)
     change_rois([],[],2,sphere_size)
 end
 
-function change_rois(~,~,roi_type,s_radius)
+function change_rois(~,~, roi_type, s_radius)
     if ~isempty(roi_patch)
         switch roi_type
             case 1 % Clusters
@@ -1633,8 +1648,10 @@ function change_rois(~,~,roi_type,s_radius)
                     hold on;
                     for ix = 1:numrois
                         if isgraphics(handles.ROI_patches(axes_iter1,ix)); delete(handles.ROI_patches(axes_iter1,ix)); end
-                        handles.ROI_patches(axes_iter1,ix) = patch(roi_patch(ix).p,'Parent',handles.axes(axes_iter1),'EdgeColor','none','FaceVertexCData',...
-                            repmat(roi_colors(ix,:),size(roi_patch(ix).p.vertices,1),1),'FaceColor','interp',...
+                        handles.ROI_patches(axes_iter1,ix) = patch(roi_patch(ix).p,...
+                            'Parent',handles.axes(axes_iter1),'EdgeColor','none',...
+                            'FaceVertexCData',cmap(round(roi_patch(ix).p.facevertexcdata), :), ... % repmat(roi_colors(ix,:), size(roi_patch(ix).p.vertices,1), 1),...
+                            'FaceColor','interp',...
                             'AlphaDataMapping','none','FaceLighting','gouraud','FaceAlpha',roi_alpha);
 %                         isonormals(roidat==axes_iter1,handles.ROI_patches(axes_iter1,ix)) 
                     end
@@ -1672,7 +1689,7 @@ function change_background_clim(~,~,~)
 end
 
 function background_cmap_callback(hObject,~,which_spec)
-    m = 64;
+    m = 200;
     switch hObject.Label
         case 'Blue-White-Red'
             background_cmap = bluewhitered(m,background_cmin,background_cmax);
@@ -1694,7 +1711,8 @@ function change_roi_single_colors(~,~,which_color)
         for axes_iter1 = 1:n_axes
             for ix = 1:size(handles.ROI_patches,2)
                 if strcmp(ROI_patches_types(1).Checked,'on')
-                    set(handles.ROI_patches(axes_iter1,ix),'FaceVertexCData',repmat(roi_single_colors(which_color,:),size(roi_patch(ix).p.vertices,1),1))
+                    set(handles.ROI_patches(axes_iter1,ix),...
+                        'FaceVertexCData',repmat(roi_single_colors(which_color,:), size(roi_patch(ix).p.vertices,1),1))
                 else
                     set(handles.ROI_patches(axes_iter1,ix),'FaceColor',roi_single_colors(which_color,:))
                 end
@@ -1724,9 +1742,11 @@ function manual_select_roi_color(~,~,c_map)
     if roi_type==1
         for axes_iter1 = 1:n_axes
             for ix = 1:size(handles.ROI_patches,2)
-                set(handles.ROI_patches(axes_iter1,ix),'FaceVertexCData',repmat(use_color,size(roi_patch(ix).p.vertices,1),1))
+                set(handles.ROI_patches(axes_iter1,ix),...
+                    'FaceVertexCData',repmat(use_color,size(roi_patch(ix).p.vertices,1),1))
                 if strcmp(ROI_patches_types(1).Checked,'on')
-                    set(handles.ROI_patches(axes_iter1,ix),'FaceVertexCData',repmat(use_color,size(roi_patch(ix).p.vertices,1),1))
+                    set(handles.ROI_patches(axes_iter1,ix),...
+                        'FaceVertexCData',repmat(use_color,size(roi_patch(ix).p.vertices,1),1))
                 else
                     set(handles.ROI_patches(axes_iter1,ix),'FaceColor',use_color)
                 end
@@ -1741,17 +1761,28 @@ function manual_select_roi_color(~,~,c_map)
     end
 end
 
-function roi_colormap_callback(hObject,~,which_color)
-    for ix = 1:12; ROI_patches_color_spec(ix).Checked = 'off'; end
+function roi_colormap_callback(hObject, ~, which_color)
+    % Update ROI Color Spectrum Menu Items:
+    for ix = 1:14 
+        ROI_patches_color_spec(ix).Checked = 'off'; 
+    end
     ROI_patches_color_spec(which_color).Checked = 'on';
-%     cmap_name = get(hObject,'Label');
+    
+    % Generate colormap
     cmap_name = hObject.Label;
-    cmap = eval([cmap_name,'(100)']);
+    if strcmp(cmap_name, 'Blue-White-Red')
+        cmap = bluewhitered(num_roi_colors, roi_voxel_clim(1), roi_voxel_clim(2));
+    elseif strcmp(cmap_name, 'Red-Blue')
+        cmap = redblue(num_roi_colors);
+    else
+        cmap = eval([cmap_name, '(num_roi_colors)']);
+    end
     for axes_iter1 = 1:n_axes
         for ix = 1:size(handles.ROI_patches,2)
-            roi_colors(ix,:) = cmap(round((ix/numrois)*100),:);
-            if strcmp(ROI_patches_types(1).Checked,'on')
-                set(handles.ROI_patches(axes_iter1,ix),'FaceVertexCData',repmat(roi_colors(ix,:),size(roi_patch(ix).p.vertices,1),1))
+            roi_colors(ix,:) = cmap(round((ix/numrois)*num_roi_colors),:);
+            if strcmp(ROI_patches_types(1).Checked, 'on')
+                set(handles.ROI_patches(axes_iter1, ix),...
+                    'FaceVertexCData', cmap(round(roi_patch(ix).p.facevertexcdata), :))
             else
                 set(handles.ROI_patches(axes_iter1,ix),'FaceColor',roi_colors(ix,:))
             end
@@ -1879,7 +1910,7 @@ end
 function edges_colormap_callback(hObject,~,which_spec)
     switch hObject.Label
         case 'Blue-White-Red'
-            rb_cmap = bluewhitered(m,cmin,cmax);
+            rb_cmap = bluewhitered(m, cmin, cmax);
         case 'Red-Blue'
             rb_cmap = redblue(m);
         otherwise
@@ -1888,7 +1919,7 @@ function edges_colormap_callback(hObject,~,which_spec)
     for ix = 1:length(edges_color_spec)
         edges_color_spec(ix).Checked = 'off';
     end; edges_color_spec(which_spec).Checked = 'on';
-    m = 64;
+    m = 200;
     change_edges_clim([],[],1)
 end
 

@@ -249,7 +249,8 @@ n_ticks_x = 10; n_ticks_y = 10;
 xticks = []; yticks = [];
 
 % Menu Handles:
-orientation_labels = {'Coronal','Sagittal','Axial',launch_3d_string,launch_mosaic_string}; % 'Mosaic'
+orientation_labels = {'Coronal', 'Sagittal', 'Axial',...
+    launch_3d_string, launch_mosaic_string}; % 'Mosaic'
 menu_orientations = zeros(1,length(orientation_labels)); 
 menu_slice_number = []; menu_colorbar = []; menu_axis_tick = [];
 
@@ -1314,6 +1315,9 @@ function reorient_callback(hObject, ~, ~)
                 end
                 overlay1_img = img;
                 overlay1_img.img = permute(combined_overlay,[2,1,3]);
+                thresholded_img = overlay1_img;
+                thresholded_img.img(isnan(thresholded_img.img)) = 0;
+                thresholded_img.img(thresholded_img.img~=0) = 1;
             end
             
             % Generate new plot
@@ -1321,7 +1325,7 @@ function reorient_callback(hObject, ~, ~)
                 
                 if numel(imageData) > 1
                     [~] = nifti_studio_3D('background',background_img,...
-                        'ROI',overlay1_img,'roi_type',1, ... %'titles','Overlay 1',...
+                        'ROI', thresholded_img, 'ROI_colors', overlay1_img, 'roi_type',1, ... %'titles','Overlay 1',...
                         'vox_thresh', quantile(background_img.img(:), background_thresh_3d));
                 else
                     [~] = nifti_studio_3D('background',background_img,... % 'titles','Background', ...

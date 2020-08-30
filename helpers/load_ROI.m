@@ -1,4 +1,4 @@
-function [roidat,numrois,roi_dim] = load_ROI(roi,background_dim,input_type,suppress_warnings)
+function [roidat,numrois,roi_dim] = load_ROI(roi, background_dim, input_type, suppress_warnings)
     if nargin<2 || isempty(background_dim)
         dont_check = true;
         if ~suppress_warnings
@@ -23,12 +23,15 @@ function [roidat,numrois,roi_dim] = load_ROI(roi,background_dim,input_type,suppr
                         error(['Error:  failed to load ',input_type,' image'])
                     end
                 end
-                roidat = roi_img.img; roi_dim = size(roidat); numrois = max(roidat(:));
+                roidat = roi_img.img; 
+                roi_dim = size(roidat); 
+                numrois = numel(unique((roidat((roidat(:)~=0) + (~isnan(roidat(:))) == 2))));
             case 'struct'
                 try
                     roidat = roi.img;
                     roi_dim = size(roidat); 
-                    numrois = max(roidat(:));
+                    numrois = numel(unique((roidat((roidat(:)~=0) + (~isnan(roidat(:))) == 2))));
+%                     numrois = max(roidat(:));
                 catch
                     error(['If input ',input_type,' is a structure, it should contain a field ''.img''.'])
                 end
@@ -52,17 +55,23 @@ function [roidat,numrois,roi_dim] = load_ROI(roi,background_dim,input_type,suppr
                     roi_dim = size(roi);
                     if dont_check || all(roi_dim==background_dim)
                         roidat = roi; 
-                        numrois = max(roidat(:));
+%                         numrois = max(roidat(:));
+                        numrois = numel(unique((roidat((roidat(:)~=0) + (~isnan(roidat(:))) == 2))));
                         if numrois==0
                             error(['Input ',input_type,' matrix contains no non-zero entries.'])
                         end
                     else
                         error(['Input ',input_type,' matrix dimensions do not match background.'])
                     end
-                else numrois = 0; roidat = 0;
+                else
+                    numrois = 0; 
+                    roidat = 0;
                 end
         end
-    else numrois = 0; roi_dim = []; roidat = [];
+    else
+        numrois = 0; 
+        roi_dim = []; 
+        roidat = [];
     end
     if ~dont_check && ~all(roi_dim==background_dim)
         error(['Input ',input_type,' matrix dimensions do not match background.'])

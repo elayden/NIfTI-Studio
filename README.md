@@ -31,6 +31,12 @@ Code:  [human_example.m](https://github.com/elayden/NIfTI-Studio/blob/master/exa
 <p align="middle">
   <img align="middle" src="https://github.com/elayden/NIfTI-Studio/blob/master/examples/human_brain_3d_rois_connections.png" width="750 hspace="30" /> 
 </p>    
+                                                                                                                                                   
+### Overlay a statistical map as colors on ROIs
+Code:  [human_example.m](https://github.com/elayden/NIfTI-Studio/blob/master/examples/human_example.m)
+<p align="middle">
+  <img align="middle" src="https://github.com/elayden/NIfTI-Studio/blob/master/examples/human_brain_3d_rois_connections_colors.png" width="750 hspace="30" /> 
+</p>                                                                                                                                            
 
 ### Slice mosaic of human MNI brain template segmented grey matter (GM) with ROIs
 Code:  [human_example.m](https://github.com/elayden/NIfTI-Studio/blob/master/examples/human_example.m)
